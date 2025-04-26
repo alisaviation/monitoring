@@ -1,3 +1,3 @@
 module github.com/alisaviation/monitoring
 
-go 1.22.7
+go 1.24.2
