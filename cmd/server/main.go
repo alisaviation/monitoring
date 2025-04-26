@@ -18,7 +18,6 @@ func main() {
 
 func run(memStorage *storage.MemStorage) error {
 	r := chi.NewRouter()
-	//r.Use(methodCheck([]string{http.MethodPost, http.MethodGet}))
 	r.Post("/update/{type}/{name}/{value}", helpers.MethodCheck([]string{http.MethodPost})(updateMetrics(memStorage)).(http.HandlerFunc))
 	r.Get("/value/{type}/{name}", helpers.MethodCheck([]string{http.MethodGet})(getValue(memStorage)).(http.HandlerFunc))
 	r.Get("/", getMetricsList(memStorage))

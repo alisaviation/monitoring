@@ -30,3 +30,11 @@ func (m *MemStorage) GetCounter(name string) (int64, bool) {
 	value, exists := m.counters[name]
 	return value, exists
 }
+
+func (m *MemStorage) Gauges() map[string]float64 {
+	return m.gauges
+}
+
+func (m *MemStorage) Counters() map[string]int64 {
+	return m.counters
+}

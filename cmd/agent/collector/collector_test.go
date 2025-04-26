@@ -29,7 +29,7 @@ func TestCollectMetrics(t *testing.T) {
 		}
 	}
 	tests := []struct {
-		ID    string
+		Name  string
 		Value float64
 		Type  models.MetricType
 	}{
@@ -65,23 +65,23 @@ func TestCollectMetrics(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		metric, exists := metrics[test.ID]
+		metric, exists := metrics[test.Name]
 		if !exists {
-			t.Errorf("Метрика %s отсутствует", test.ID)
+			t.Errorf("Метрика %s отсутствует", test.Name)
 			continue
 		}
 
 		if metric.Type != test.Type {
-			t.Errorf("Неверный тип метрики %s: ожидается %s, получено %s", test.ID, test.Type, metric.Type)
+			t.Errorf("Неверный тип метрики %s: ожидается %s, получено %s", test.Name, test.Type, metric.Type)
 		}
 
-		if test.ID == "RandomValue" {
+		if test.Name == "RandomValue" {
 			// RandomValue не может быть точно проверен, так как он генерируется случайным образом
 			continue
 		}
 
 		if metric.Value != test.Value {
-			t.Errorf("Неверное значение метрики %s: ожидается %v, получено %v", test.ID, test.Value, metric.Value)
+			t.Errorf("Неверное значение метрики %s: ожидается %v, получено %v", test.Name, test.Value, metric.Value)
 		}
 	}
 }

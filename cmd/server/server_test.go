@@ -7,13 +7,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/alisaviation/monitoring/cmd/server/helpers"
 	"github.com/alisaviation/monitoring/internal/storage"
 )
 
 func TestMethodCheck(t *testing.T) {
 	memStorage := storage.NewMemStorage()
 	handler := chi.NewRouter()
-	handler.Use(methodCheck([]string{http.MethodPost, http.MethodGet}))
+	handler.Use(helpers.MethodCheck([]string{http.MethodPost, http.MethodGet}))
 
 	handler.Post("/update/{type}/{name}/{value}", updateMetrics(memStorage))
 	handler.Get("/value/{type}/{name}", getValue(memStorage))

@@ -27,7 +27,7 @@ func main() {
 			if metric.Type == models.Counter {
 				if existingMetric, exists := metricsBuffer[id]; exists {
 					metricsBuffer[id] = models.Metric{
-						ID:    existingMetric.ID,
+						Name:  existingMetric.Name,
 						Value: existingMetric.Value + metric.Value,
 						Type:  existingMetric.Type,
 					}

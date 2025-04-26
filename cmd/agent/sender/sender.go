@@ -5,39 +5,37 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/go-resty/resty/v2"
+
 	"github.com/alisaviation/monitoring/internal/models"
 )
 
 type Sender struct {
 	serverAddress string
+	client        *resty.Client
 }
 
 func NewSender(serverAddress string) *Sender {
 	return &Sender{
 		serverAddress: serverAddress,
+		client:        resty.New(),
 	}
 }
 
 func (s *Sender) SendMetrics(metrics map[string]models.Metric) {
-	for id, metric := range metrics {
-		url := fmt.Sprintf("%s/update/%s/%s/%v", s.serverAddress, metric.Type, id, metric.Value)
-		req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte{}))
-		if err != nil {
-			fmt.Println("Error creating request:", err)
-			continue
-		}
-		req.Header.Set("Content-Type", "text/plain")
-
-		client := &http.Client{}
-		resp, err := client.Do(req)
+	for name, metric := range metrics {
+		url := fmt.Sprintf("%s/update/%s/%s/%v", s.serverAddress, metric.Type, name, metric.Value)
+		resp, err := s.client.R().
+			SetHeader("Content-Type", "text/plain").
+			SetBody(bytes.NewBuffer([]byte{})).
+			Post(url)
 		if err != nil {
 			fmt.Println("Error sending request:", err)
 			continue
 		}
-		defer resp.Body.Close()
 
-		if resp.StatusCode != http.StatusOK {
-			fmt.Println("Error response from server:", resp.Status)
+		if resp.StatusCode() != http.StatusOK {
+			fmt.Println("Error response from server:", resp.Status())
 		}
 	}
 }
