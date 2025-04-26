@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/alisaviation/monitoring/cmd/agent/collector"
@@ -13,9 +14,35 @@ import (
 )
 
 func main() {
-	serverAddress := flag.String("a", "http://localhost:8080", "HTTP server endpoint address")
-	reportInterval := flag.Duration("r", 10*time.Second, "Report interval for sending metrics (in seconds)")
-	pollInterval := flag.Duration("p", 2*time.Second, "Poll interval for collecting metrics (in seconds)")
+	defaultServerAddress := "http://localhost:8080"
+	defaultReportInterval := 10 * time.Second
+	defaultPollInterval := 2 * time.Second
+
+	serverAddressEnv := os.Getenv("ADDRESS")
+	reportIntervalEnv := os.Getenv("REPORT_INTERVAL")
+	pollIntervalEnv := os.Getenv("POLL_INTERVAL")
+
+	if serverAddressEnv != "" {
+		defaultServerAddress = serverAddressEnv
+	}
+	if reportIntervalEnv != "" {
+		var err error
+		defaultReportInterval, err = time.ParseDuration(reportIntervalEnv + "s")
+		if err != nil {
+			log.Fatalf("Invalid REPORT_INTERVAL value: %v", err)
+		}
+	}
+	if pollIntervalEnv != "" {
+		var err error
+		defaultPollInterval, err = time.ParseDuration(pollIntervalEnv + "s")
+		if err != nil {
+			log.Fatalf("Invalid POLL_INTERVAL value: %v", err)
+		}
+	}
+
+	serverAddress := flag.String("a", defaultServerAddress, "HTTP server endpoint address")
+	reportInterval := flag.Duration("r", defaultReportInterval, "Report interval for sending metrics (in seconds)")
+	pollInterval := flag.Duration("p", defaultPollInterval, "Poll interval for collecting metrics (in seconds)")
 
 	flag.Parse()
 	if len(flag.Args()) > 0 {
