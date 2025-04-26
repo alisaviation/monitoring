@@ -1,7 +1,9 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/alisaviation/monitoring/cmd/agent/collector"
@@ -11,14 +13,20 @@ import (
 )
 
 func main() {
-	pollInterval := 2 * time.Second
-	reportInterval := 10 * time.Second
-	serverAddress := "http://localhost:8080"
+	serverAddress := flag.String("a", "http://localhost:8080", "HTTP server endpoint address")
+	reportInterval := flag.Duration("r", 10*time.Second, "Report interval for sending metrics (in seconds)")
+	pollInterval := flag.Duration("p", 2*time.Second, "Poll interval for collecting metrics (in seconds)")
+
+	flag.Parse()
+	if len(flag.Args()) > 0 {
+		log.Fatalf("Unknown flags: %v", flag.Args())
+	}
 
 	collectorInstance := collector.NewCollector()
-	senderInstance := sender.NewSender(serverAddress)
+	senderInstance := sender.NewSender(*serverAddress)
 
 	metricsBuffer := make(map[string]models.Metric)
+	lastReportTime := time.Now()
 
 	for {
 		metrics := collectorInstance.CollectMetrics()
@@ -40,11 +48,12 @@ func main() {
 			}
 		}
 
-		time.Sleep(pollInterval)
+		time.Sleep(*pollInterval)
 
-		if time.Now().UnixNano()%int64(reportInterval) == 0 {
+		if time.Since(lastReportTime) >= *reportInterval {
 			senderInstance.SendMetrics(metricsBuffer)
 			metricsBuffer = make(map[string]models.Metric)
+			lastReportTime = time.Now()
 		}
 	}
 }
