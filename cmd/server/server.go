@@ -6,23 +6,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
+
+	"github.com/alisaviation/monitoring/cmd/server/helpers"
 	"github.com/alisaviation/monitoring/internal/models"
 	"github.com/alisaviation/monitoring/internal/storage"
 )
-
-func methodCheck(methods []string) func(http.HandlerFunc) http.HandlerFunc {
-	return func(next http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			for _, method := range methods {
-				if r.Method == method {
-					next(w, r)
-					return
-				}
-			}
-			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		}
-	}
-}
 
 func updateMetrics(memStorage *storage.MemStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -32,17 +21,11 @@ func updateMetrics(memStorage *storage.MemStorage) http.HandlerFunc {
 			return
 		}
 
-		parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/update/"), "/")
-		if len(parts) != 3 {
-			http.Error(w, "Not Found", http.StatusNotFound)
-			return
-		}
+		metricType := chi.URLParam(r, "type")
+		metricName := chi.URLParam(r, "name")
+		metricValue := chi.URLParam(r, "value")
 
-		metricType := models.MetricType(parts[0])
-		metricName := parts[1]
-		metricValue := parts[2]
-
-		switch metricType {
+		switch models.MetricType(metricType) {
 		case models.Gauge:
 			value, err := strconv.ParseFloat(metricValue, 64)
 			if err != nil {
@@ -64,5 +47,50 @@ func updateMetrics(memStorage *storage.MemStorage) http.HandlerFunc {
 
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "Metrics updated")
+	}
+}
+
+func getValue(memStorage *storage.MemStorage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		metricType := chi.URLParam(r, "type")
+		metricName := chi.URLParam(r, "name")
+
+		switch models.MetricType(metricType) {
+		case models.Gauge:
+			value, exists := memStorage.GetGauge(metricName)
+			if !exists {
+				http.Error(w, "Not Found", http.StatusNotFound)
+				return
+			}
+			helpers.WriteResponse(w, http.StatusOK, value)
+		case models.Counter:
+			value, exists := memStorage.GetCounter(metricName)
+			if !exists {
+				http.Error(w, "Not Found", http.StatusNotFound)
+				return
+			}
+			helpers.WriteResponse(w, http.StatusOK, value)
+		default:
+			http.Error(w, "Bad Request: invalid metric type", http.StatusBadRequest)
+			return
+		}
+	}
+}
+
+func getMetricsList(memStorage *storage.MemStorage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+
+		var response strings.Builder
+		response.WriteString("<html><body><h1>Metrics</h1><ul>")
+		for name, value := range memStorage.Gauges() {
+			response.WriteString(fmt.Sprintf("<li>%s: %.2f</li>", name, value))
+		}
+		for name, value := range memStorage.Counters() {
+			response.WriteString(fmt.Sprintf("<li>%s: %d</li>", name, value))
+		}
+		response.WriteString("</ul></body></html>")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(response.String()))
 	}
 }

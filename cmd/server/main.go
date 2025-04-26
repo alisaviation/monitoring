@@ -3,6 +3,9 @@ package main
 import (
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+
+	"github.com/alisaviation/monitoring/cmd/server/helpers"
 	"github.com/alisaviation/monitoring/internal/storage"
 )
 
@@ -14,7 +17,11 @@ func main() {
 }
 
 func run(memStorage *storage.MemStorage) error {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/update/", methodCheck([]string{http.MethodPost})(updateMetrics(memStorage)))
-	return http.ListenAndServe(`:8080`, mux)
+	r := chi.NewRouter()
+	//r.Use(methodCheck([]string{http.MethodPost, http.MethodGet}))
+	r.Post("/update/{type}/{name}/{value}", helpers.MethodCheck([]string{http.MethodPost})(updateMetrics(memStorage)).(http.HandlerFunc))
+	r.Get("/value/{type}/{name}", helpers.MethodCheck([]string{http.MethodGet})(getValue(memStorage)).(http.HandlerFunc))
+	r.Get("/", getMetricsList(memStorage))
+
+	return http.ListenAndServe(`:8080`, r)
 }
