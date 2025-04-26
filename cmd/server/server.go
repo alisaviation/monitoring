@@ -61,6 +61,7 @@ func updateMetrics(memStorage *storage.MemStorage) http.HandlerFunc {
 			http.Error(w, "Bad Request: invalid metric type", http.StatusBadRequest)
 			return
 		}
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "Metrics updated")

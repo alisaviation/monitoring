@@ -19,9 +19,9 @@ func NewSender(serverAddress string) *Sender {
 }
 
 func (s *Sender) SendMetrics(metrics map[string]models.Metric) {
-	for id, metric := range metrics {
-		url := fmt.Sprintf("%s/update/%s/%s/%v", s.serverAddress, metric.Type, id, metric.Value)
-		req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte{}))
+	for name, metric := range metrics {
+		url := fmt.Sprintf("%s/update/%s/%s/%v", s.serverAddress, metric.Type, name, metric.Value)
+		req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer([]byte{}))
 		if err != nil {
 			fmt.Println("Error creating request:", err)
 			continue
@@ -37,7 +37,9 @@ func (s *Sender) SendMetrics(metrics map[string]models.Metric) {
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
-			fmt.Println("Error response from server:", resp.Status)
+			fmt.Println("Error response from server for %s: %s\n", url, resp.Status)
+		} else {
+			fmt.Println("Metrics sent successfully to %s\n", url)
 		}
 	}
 }
