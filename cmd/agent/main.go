@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"time"
 
@@ -39,7 +38,6 @@ func main() {
 						Value: existingMetric.Value + metric.Value,
 						Type:  existingMetric.Type,
 					}
-					fmt.Println("count", metricsBuffer)
 				} else {
 					metricsBuffer[id] = metric
 				}

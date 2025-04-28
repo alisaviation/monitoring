@@ -3,6 +3,7 @@ package helpers
 import (
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 func WriteResponse(w http.ResponseWriter, statusCode int, body interface{}) {
@@ -11,9 +12,9 @@ func WriteResponse(w http.ResponseWriter, statusCode int, body interface{}) {
 
 	switch v := body.(type) {
 	case float64:
-		w.Write([]byte(fmt.Sprintf("%.2f", v)))
+		fmt.Fprintf(w, "%s", FormatFloat(v))
 	case int64:
-		w.Write([]byte(fmt.Sprintf("%d", v)))
+		fmt.Fprintf(w, "%d", v)
 	default:
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
@@ -30,4 +31,9 @@ func MethodCheck(methods []string) func(next http.Handler) http.Handler {
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		})
 	}
+}
+
+func FormatFloat(value float64) string {
+	formatted := fmt.Sprintf("%.3f", value)
+	return strings.TrimRight(strings.TrimRight(formatted, "0"), ".")
 }

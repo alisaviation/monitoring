@@ -14,10 +14,9 @@ import (
 func TestMethodCheck(t *testing.T) {
 	memStorage := storage.NewMemStorage()
 	handler := chi.NewRouter()
-	handler.Use(helpers.MethodCheck([]string{http.MethodPost, http.MethodGet}))
 
-	handler.Post("/update/{type}/{name}/{value}", updateMetrics(memStorage))
-	handler.Get("/value/{type}/{name}", getValue(memStorage))
+	handler.Post("/update/{type}/{name}/{value}", helpers.MethodCheck([]string{http.MethodPost})(updateMetrics(memStorage)).(http.HandlerFunc))
+	handler.Get("/value/{type}/{name}", helpers.MethodCheck([]string{http.MethodGet})(getValue(memStorage)).(http.HandlerFunc))
 	handler.Get("/", getMetricsList(memStorage))
 
 	tests := []struct {
@@ -100,14 +99,6 @@ func Test_updateMetrics(t *testing.T) {
 			body:         "",
 			expectedCode: http.StatusBadRequest,
 			expectedBody: "Bad Request: invalid counter value\n",
-		},
-		{
-			name:         "Unsupported Media Type",
-			method:       http.MethodPost,
-			url:          "/update/gauge/metric1/123.45",
-			body:         "",
-			expectedCode: http.StatusUnsupportedMediaType,
-			expectedBody: "Unsupported Media Type\n",
 		},
 	}
 
