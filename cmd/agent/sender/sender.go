@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/alisaviation/monitoring/internal/models"
 )
@@ -28,7 +29,9 @@ func (s *Sender) SendMetrics(metrics map[string]models.Metric) {
 		}
 		req.Header.Set("Content-Type", "text/plain")
 
-		client := &http.Client{}
+		client := &http.Client{
+			Timeout: 20 * time.Second,
+		}
 		resp, err := client.Do(req)
 		if err != nil {
 			fmt.Println("Error sending request:", err)
@@ -37,9 +40,9 @@ func (s *Sender) SendMetrics(metrics map[string]models.Metric) {
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
-			fmt.Println("Error response from server for %s: %s\n", url, resp.Status)
+			fmt.Printf("Error response from server for %s: %s\n", url, resp.Status)
 		} else {
-			fmt.Println("Metrics sent successfully to %s\n", url)
+			fmt.Printf("Metrics sent successfully to %s\n", url)
 		}
 	}
 }
