@@ -8,20 +8,18 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/alisaviation/monitoring/cmd/server/helpers"
+	"github.com/alisaviation/monitoring/internal/config"
 	"github.com/alisaviation/monitoring/internal/storage"
 )
 
 func main() {
-	addr := flag.String("a", "localhost:8080", "HTTP server endpoint address")
-
-	flag.Parse()
-
+	conf := config.SetConfigServer()
 	if len(flag.Args()) > 0 {
 		log.Fatalf("Unknown flags: %v", flag.Args())
 	}
 
 	memStorage := storage.NewMemStorage()
-	if err := run(memStorage, *addr); err != nil {
+	if err := run(memStorage, conf.ServerAddress); err != nil {
 		log.Fatalf("Error running server: %v", err)
 	}
 }

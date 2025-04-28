@@ -29,9 +29,17 @@ func (s *Sender) SendMetrics(metrics map[string]models.Metric) {
 			SetHeader("Content-Type", "text/plain").
 			SetBody(bytes.NewBuffer([]byte{})).
 			Post(url)
+
 		if err != nil {
 			fmt.Println("Error sending request:", err)
 			continue
+		}
+
+		if resp != nil {
+			defer resp.RawResponse.Body.Close()
+			if err := resp.RawResponse.Body.Close(); err != nil {
+				fmt.Println("Error closing response body:", err)
+			}
 		}
 
 		if resp.StatusCode() != http.StatusOK {

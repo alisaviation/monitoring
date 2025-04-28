@@ -16,11 +16,6 @@ import (
 func updateMetrics(memStorage *storage.MemStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		//if r.Header.Get("Content-Type") != "text/plain" {
-		//	http.Error(w, "Unsupported Media Type", http.StatusUnsupportedMediaType)
-		//	return
-		//}
-
 		metricType := chi.URLParam(r, "type")
 		metricName := chi.URLParam(r, "name")
 		metricValue := chi.URLParam(r, "value")
