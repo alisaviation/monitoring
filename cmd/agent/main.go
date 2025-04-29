@@ -1,86 +1,68 @@
 package main
 
 import (
-	"flag"
-	"fmt"
-	"log"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/alisaviation/monitoring/cmd/agent/collector"
 	"github.com/alisaviation/monitoring/cmd/agent/sender"
+	"github.com/alisaviation/monitoring/internal/config"
 
 	"github.com/alisaviation/monitoring/internal/models"
 )
 
 func main() {
-	defaultServerAddress := "http://localhost:8080"
-	defaultReportInterval := 10 * time.Second
-	defaultPollInterval := 2 * time.Second
+	conf := config.SetConfigAgent()
 
-	serverAddressEnv := os.Getenv("ADDRESS")
-	reportIntervalEnv := os.Getenv("REPORT_INTERVAL")
-	pollIntervalEnv := os.Getenv("POLL_INTERVAL")
-
-	if serverAddressEnv != "" {
-		defaultServerAddress = serverAddressEnv
+	if address := os.Getenv("ADDRESS"); address != "" {
+		conf.ServerAddress = address
 	}
-	if reportIntervalEnv != "" {
-		var err error
-		defaultReportInterval, err = time.ParseDuration(reportIntervalEnv + "s")
-		if err != nil {
-			log.Fatalf("Invalid REPORT_INTERVAL value: %v", err)
+	if reportIntervalStr := os.Getenv("REPORT_INTERVAL"); reportIntervalStr != "" {
+		if reportInterval, err := strconv.Atoi(reportIntervalStr); err == nil {
+			conf.ReportInterval = time.Duration(reportInterval) * time.Second
 		}
 	}
-	if pollIntervalEnv != "" {
-		var err error
-		defaultPollInterval, err = time.ParseDuration(pollIntervalEnv + "s")
-		if err != nil {
-			log.Fatalf("Invalid POLL_INTERVAL value: %v", err)
+	if pollIntervalStr := os.Getenv("POLL_INTERVAL"); pollIntervalStr != "" {
+		if pollInterval, err := strconv.Atoi(pollIntervalStr); err == nil {
+			conf.PollInterval = time.Duration(pollInterval) * time.Second
 		}
 	}
-
-	serverAddress := flag.String("a", defaultServerAddress, "HTTP server endpoint address")
-	reportInterval := flag.Duration("r", defaultReportInterval, "Report interval for sending metrics (in seconds)")
-	pollInterval := flag.Duration("p", defaultPollInterval, "Poll interval for collecting metrics (in seconds)")
-
-	flag.Parse()
-	if len(flag.Args()) > 0 {
-		log.Fatalf("Unknown flags: %v", flag.Args())
+	if !strings.Contains(conf.ServerAddress, "://") {
+		conf.ServerAddress = "http://" + conf.ServerAddress
 	}
 
 	collectorInstance := collector.NewCollector()
-	senderInstance := sender.NewSender(*serverAddress)
-
+	senderInstance := sender.NewSender(conf.ServerAddress)
 	metricsBuffer := make(map[string]models.Metric)
 	lastReportTime := time.Now()
 
 	for {
 		metrics := collectorInstance.CollectMetrics()
 
-		for id, metric := range metrics {
+		for name, metric := range metrics {
 			if metric.Type == models.Counter {
-				if existingMetric, exists := metricsBuffer[id]; exists {
-					metricsBuffer[id] = models.Metric{
+				if existingMetric, exists := metricsBuffer[name]; exists {
+					metricsBuffer[name] = models.Metric{
 						Name:  existingMetric.Name,
 						Value: existingMetric.Value + metric.Value,
 						Type:  existingMetric.Type,
 					}
-					fmt.Println("count", metricsBuffer)
 				} else {
-					metricsBuffer[id] = metric
+					metricsBuffer[name] = metric
 				}
 			} else {
-				metricsBuffer[id] = metric
+				metricsBuffer[name] = metric
 			}
 		}
 
-		time.Sleep(*pollInterval)
-
-		if time.Since(lastReportTime) >= *reportInterval {
+		time.Sleep(conf.PollInterval)
+		currentTime := time.Now()
+		if currentTime.Sub(lastReportTime) >= conf.ReportInterval {
 			senderInstance.SendMetrics(metricsBuffer)
 			metricsBuffer = make(map[string]models.Metric)
-			lastReportTime = time.Now()
+			lastReportTime = currentTime
 		}
 	}
 }

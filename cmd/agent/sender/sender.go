@@ -34,6 +34,13 @@ func (s *Sender) SendMetrics(metrics map[string]models.Metric) {
 			continue
 		}
 
+		if resp != nil {
+			defer resp.RawResponse.Body.Close()
+			if err := resp.RawResponse.Body.Close(); err != nil {
+				fmt.Println("Error closing response body:", err)
+			}
+		}
+
 		if resp.StatusCode() != http.StatusOK {
 			fmt.Println("Error response from server:", resp.Status())
 		}

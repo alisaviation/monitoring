@@ -16,11 +16,6 @@ import (
 func updateMetrics(memStorage *storage.MemStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		if r.Header.Get("Content-Type") != "text/plain" {
-			http.Error(w, "Unsupported Media Type", http.StatusUnsupportedMediaType)
-			return
-		}
-
 		metricType := chi.URLParam(r, "type")
 		metricName := chi.URLParam(r, "name")
 		metricValue := chi.URLParam(r, "value")
@@ -84,7 +79,7 @@ func getMetricsList(memStorage *storage.MemStorage) http.HandlerFunc {
 		var response strings.Builder
 		response.WriteString("<html><body><h1>Metrics</h1><ul>")
 		for name, value := range memStorage.Gauges() {
-			response.WriteString(fmt.Sprintf("<li>%s: %.2f</li>", name, value))
+			response.WriteString(fmt.Sprintf("<li>%s: %s</li>", name, helpers.FormatFloat(value)))
 		}
 		for name, value := range memStorage.Counters() {
 			response.WriteString(fmt.Sprintf("<li>%s: %d</li>", name, value))
