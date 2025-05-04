@@ -19,17 +19,18 @@ func WriteResponse(w http.ResponseWriter, statusCode int, body interface{}) {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
-func MethodCheck(methods []string) func(next http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+func MethodCheck(methods []string) func(next http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
 			for _, method := range methods {
 				if r.Method == method {
-					next.ServeHTTP(w, r)
+					next(w, r)
 					return
 				}
 			}
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		})
+		}
 	}
 }
 

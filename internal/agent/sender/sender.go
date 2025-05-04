@@ -1,7 +1,6 @@
 package sender
 
 import (
-	"bytes"
 	"fmt"
 	"net/http"
 
@@ -22,13 +21,16 @@ func NewSender(serverAddress string) *Sender {
 	}
 }
 
-func (s *Sender) SendMetrics(metrics map[string]models.Metric) {
+func (s *Sender) SendMetrics(metrics map[string]*models.Metric) {
 	for name, metric := range metrics {
-		url := fmt.Sprintf("%s/update/%s/%s/%v", s.serverAddress, metric.Type, name, metric.Value)
 		resp, err := s.client.R().
 			SetHeader("Content-Type", "text/plain").
-			SetBody(bytes.NewBuffer([]byte{})).
-			Post(url)
+			SetPathParams(map[string]string{
+				"type":  string(metric.Type),
+				"name":  name,
+				"value": fmt.Sprintf("%v", metric.Value),
+			}).
+			Post("http://" + s.serverAddress + "/update/{type}/{name}/{value}")
 		if err != nil {
 			fmt.Println("Error sending request:", err)
 			continue

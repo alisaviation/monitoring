@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"net/http"
@@ -7,17 +7,17 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/alisaviation/monitoring/cmd/server/helpers"
+	"github.com/alisaviation/monitoring/internal/server/helpers"
 	"github.com/alisaviation/monitoring/internal/storage"
 )
 
 func TestMethodCheck(t *testing.T) {
 	memStorage := storage.NewMemStorage()
 	handler := chi.NewRouter()
-	
-	handler.Post("/update/{type}/{name}/{value}", helpers.MethodCheck([]string{http.MethodPost})(updateMetrics(memStorage)).(http.HandlerFunc))
-	handler.Get("/value/{type}/{name}", helpers.MethodCheck([]string{http.MethodGet})(getValue(memStorage)).(http.HandlerFunc))
-	handler.Get("/", getMetricsList(memStorage))
+
+	handler.Post("/update/{type}/{name}/{value}", helpers.MethodCheck([]string{http.MethodPost})(UpdateMetrics(memStorage)).(http.HandlerFunc))
+	handler.Get("/value/{type}/{name}", helpers.MethodCheck([]string{http.MethodGet})(GetValue(memStorage)).(http.HandlerFunc))
+	handler.Get("/", GetMetricsList(memStorage))
 
 	tests := []struct {
 		name         string
@@ -106,7 +106,7 @@ func Test_updateMetrics(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			memStorage := storage.NewMemStorage()
 			handler := chi.NewRouter()
-			handler.Post("/update/{type}/{name}/{value}", updateMetrics(memStorage))
+			handler.Post("/update/{type}/{name}/{value}", UpdateMetrics(memStorage))
 
 			req := httptest.NewRequest(tt.method, tt.url, nil)
 			if tt.method == http.MethodPost {
@@ -181,7 +181,7 @@ func Test_getValue(t *testing.T) {
 			memStorage.AddCounter("metric2", 100)
 
 			handler := chi.NewRouter()
-			handler.Get("/value/{type}/{name}", getValue(memStorage))
+			handler.Get("/value/{type}/{name}", GetValue(memStorage))
 
 			req := httptest.NewRequest(tt.method, tt.url, nil)
 			w := httptest.NewRecorder()
