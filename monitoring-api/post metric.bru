@@ -1,0 +1,16 @@
+meta {
+  name: post metric
+  type: http
+  seq: 2
+}
+
+post {
+  url: http://localhost:8080/update/gauge/temperature/9
+  body: none
+  auth: none
+}
+
+headers {
+  Content-Length: 0
+  Content-Type: text/plain
+}
