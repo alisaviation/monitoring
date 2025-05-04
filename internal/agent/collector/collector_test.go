@@ -11,16 +11,17 @@ func TestCollectMetrics(t *testing.T) {
 
 	mockReader := &MockMemStatsReader{}
 	c := &Collector{
-		metrics: make(map[string]models.Metric),
+		metrics: make(map[string]*models.Metric),
 		reader:  mockReader,
 	}
+	c.initMetrics()
 
 	metrics := c.CollectMetrics()
 	expectedMetrics := []string{
-		"Alloc", "BuckHashSys", "Frees", "GCCPUFraction", "GCSys", "HeapAlloc", "HeapIdle", "HeapInuse",
-		"HeapObjects", "HeapReleased", "HeapSys", "LastGC", "Lookups", "MCacheInuse", "MCacheSys", "MSpanInuse",
-		"MSpanSys", "Mallocs", "NextGC", "NumForcedGC", "NumGC", "OtherSys", "PauseTotalNs", "StackInuse",
-		"StackSys", "Sys", "TotalAlloc", "RandomValue", "PollCount",
+		models.Alloc, models.BuckHashSys, models.Frees, models.GCCPUFraction, models.GCSys, models.HeapAlloc, models.HeapIdle, models.HeapInuse,
+		models.HeapObjects, models.HeapReleased, models.HeapSys, models.LastGC, models.Lookups, models.MCacheInuse, models.MCacheSys, models.MSpanInuse,
+		models.MSpanSys, models.Mallocs, models.NextGC, models.NumForcedGC, models.NumGC, models.OtherSys, models.PauseTotalNs, models.StackInuse,
+		models.StackSys, models.Sys, models.TotalAlloc, models.RandomValue, models.PollCount,
 	}
 
 	for _, id := range expectedMetrics {
@@ -33,35 +34,35 @@ func TestCollectMetrics(t *testing.T) {
 		Value float64
 		Type  models.MetricType
 	}{
-		{"Alloc", 1000, models.Gauge},
-		{"BuckHashSys", 2000, models.Gauge},
-		{"Frees", 3000, models.Gauge},
-		{"GCCPUFraction", 0.1, models.Gauge},
-		{"GCSys", 4000, models.Gauge},
-		{"HeapAlloc", 5000, models.Gauge},
-		{"HeapIdle", 6000, models.Gauge},
-		{"HeapInuse", 7000, models.Gauge},
-		{"HeapObjects", 8000, models.Gauge},
-		{"HeapReleased", 9000, models.Gauge},
-		{"HeapSys", 10000, models.Gauge},
-		{"LastGC", 11000, models.Gauge},
-		{"Lookups", 12000, models.Gauge},
-		{"MCacheInuse", 13000, models.Gauge},
-		{"MCacheSys", 14000, models.Gauge},
-		{"MSpanInuse", 15000, models.Gauge},
-		{"MSpanSys", 16000, models.Gauge},
-		{"Mallocs", 17000, models.Gauge},
-		{"NextGC", 18000, models.Gauge},
-		{"NumForcedGC", 19000, models.Gauge},
-		{"NumGC", 20000, models.Gauge},
-		{"OtherSys", 21000, models.Gauge},
-		{"PauseTotalNs", 22000, models.Gauge},
-		{"StackInuse", 23000, models.Gauge},
-		{"StackSys", 24000, models.Gauge},
-		{"Sys", 25000, models.Gauge},
-		{"TotalAlloc", 26000, models.Gauge},
-		{"RandomValue", rand.Float64(), models.Gauge},
-		{"PollCount", 1.0, models.Counter},
+		{Name: models.Alloc, Value: 1000, Type: models.Gauge},
+		{Name: models.BuckHashSys, Value: 2000, Type: models.Gauge},
+		{Name: models.Frees, Value: 3000, Type: models.Gauge},
+		{Name: models.GCCPUFraction, Value: 0.1, Type: models.Gauge},
+		{Name: models.GCSys, Value: 4000, Type: models.Gauge},
+		{Name: models.HeapAlloc, Value: 5000, Type: models.Gauge},
+		{Name: models.HeapIdle, Value: 6000, Type: models.Gauge},
+		{Name: models.HeapInuse, Value: 7000, Type: models.Gauge},
+		{Name: models.HeapObjects, Value: 8000, Type: models.Gauge},
+		{Name: models.HeapReleased, Value: 9000, Type: models.Gauge},
+		{Name: models.HeapSys, Value: 10000, Type: models.Gauge},
+		{Name: models.LastGC, Value: 11000, Type: models.Gauge},
+		{Name: models.Lookups, Value: 12000, Type: models.Gauge},
+		{Name: models.MCacheInuse, Value: 13000, Type: models.Gauge},
+		{Name: models.MCacheSys, Value: 14000, Type: models.Gauge},
+		{Name: models.MSpanInuse, Value: 15000, Type: models.Gauge},
+		{Name: models.MSpanSys, Value: 16000, Type: models.Gauge},
+		{Name: models.Mallocs, Value: 17000, Type: models.Gauge},
+		{Name: models.NextGC, Value: 18000, Type: models.Gauge},
+		{Name: models.NumForcedGC, Value: 19000, Type: models.Gauge},
+		{Name: models.NumGC, Value: 20000, Type: models.Gauge},
+		{Name: models.OtherSys, Value: 21000, Type: models.Gauge},
+		{Name: models.PauseTotalNs, Value: 22000, Type: models.Gauge},
+		{Name: models.StackInuse, Value: 23000, Type: models.Gauge},
+		{Name: models.StackSys, Value: 24000, Type: models.Gauge},
+		{Name: models.Sys, Value: 25000, Type: models.Gauge},
+		{Name: models.TotalAlloc, Value: 26000, Type: models.Gauge},
+		{Name: models.RandomValue, Value: rand.Float64(), Type: models.Gauge},
+		{Name: models.PollCount, Value: 1.0, Type: models.Counter},
 	}
 
 	for _, test := range tests {

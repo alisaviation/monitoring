@@ -14,9 +14,10 @@ import (
 func TestMethodCheck(t *testing.T) {
 	memStorage := storage.NewMemStorage()
 	handler := chi.NewRouter()
+	server := &Server{MemStorage: memStorage}
 
-	handler.Post("/update/{type}/{name}/{value}", helpers.MethodCheck([]string{http.MethodPost})(UpdateMetrics(memStorage)).(http.HandlerFunc))
-	handler.Get("/value/{type}/{name}", helpers.MethodCheck([]string{http.MethodGet})(GetValue(memStorage)).(http.HandlerFunc))
+	handler.Post("/update/{type}/{name}/{value}", helpers.MethodCheck([]string{http.MethodPost})(server.UpdateMetrics))
+	handler.Get("/value/{type}/{name}", helpers.MethodCheck([]string{http.MethodGet})(server.GetValue))
 	handler.Get("/", GetMetricsList(memStorage))
 
 	tests := []struct {
@@ -106,8 +107,9 @@ func Test_updateMetrics(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			memStorage := storage.NewMemStorage()
 			handler := chi.NewRouter()
-			handler.Post("/update/{type}/{name}/{value}", UpdateMetrics(memStorage))
+			server := &Server{MemStorage: memStorage}
 
+			handler.Post("/update/{type}/{name}/{value}", helpers.MethodCheck([]string{http.MethodPost})(server.UpdateMetrics))
 			req := httptest.NewRequest(tt.method, tt.url, nil)
 			if tt.method == http.MethodPost {
 				req.Header.Set("Content-Type", "text/plain")
@@ -180,8 +182,9 @@ func Test_getValue(t *testing.T) {
 			memStorage.SetGauge("metric1", 123.45)
 			memStorage.AddCounter("metric2", 100)
 
+			server := &Server{MemStorage: memStorage}
 			handler := chi.NewRouter()
-			handler.Get("/value/{type}/{name}", GetValue(memStorage))
+			handler.Get("/value/{type}/{name}", helpers.MethodCheck([]string{http.MethodGet})(server.GetValue))
 
 			req := httptest.NewRequest(tt.method, tt.url, nil)
 			w := httptest.NewRecorder()
