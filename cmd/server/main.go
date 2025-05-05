@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/alisaviation/monitoring/internal/config"
+	"github.com/alisaviation/monitoring/internal/logger"
 	"github.com/alisaviation/monitoring/internal/server"
 	"github.com/alisaviation/monitoring/internal/server/helpers"
 	"github.com/alisaviation/monitoring/internal/storage"
@@ -22,6 +23,11 @@ func main() {
 	if address := os.Getenv("ADDRESS"); address != "" {
 		conf.ServerAddress = address
 	}
+
+	if err := logger.Initialize("info"); err != nil {
+		log.Fatalf("Error initializing logger: %v", err)
+	}
+
 	memStorage := storage.NewMemStorage()
 	if err := run(memStorage, conf.ServerAddress); err != nil {
 		log.Fatalf("Error running server: %v", err)
@@ -31,6 +37,7 @@ func main() {
 func run(memStorage *storage.MemStorage, addr string) error {
 	srvr := &server.Server{MemStorage: memStorage}
 	r := chi.NewRouter()
+	r.Use(logger.RequestResponseLogger)
 	r.Post("/update/{type}/{name}/{value}", helpers.MethodCheck([]string{http.MethodPost})(srvr.UpdateMetrics))
 	r.Get("/value/{type}/{name}", helpers.MethodCheck([]string{http.MethodGet})(srvr.GetValue))
 	r.Get("/", server.GetMetricsList(memStorage))
