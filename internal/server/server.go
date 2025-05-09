@@ -1,12 +1,10 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
-
-	"github.com/go-chi/chi/v5"
 
 	"github.com/alisaviation/monitoring/internal/models"
 	"github.com/alisaviation/monitoring/internal/server/helpers"
@@ -18,60 +16,79 @@ type Server struct {
 }
 
 func (s *Server) UpdateMetrics(w http.ResponseWriter, r *http.Request) {
+	var metrics models.Metric
+	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
-	metricType := chi.URLParam(r, "type")
-	metricName := chi.URLParam(r, "name")
-	metricValue := chi.URLParam(r, "value")
-
-	switch models.MetricType(metricType) {
+	switch metrics.MType {
 	case models.Gauge:
-		value, err := strconv.ParseFloat(metricValue, 64)
-		if err != nil {
-			http.Error(w, "Bad Request: invalid gauge value", http.StatusBadRequest)
+		if metrics.Value == nil {
+			http.Error(w, "Bad Request: value is required for gauge", http.StatusBadRequest)
 			return
 		}
-		s.MemStorage.SetGauge(metricName, value)
+		s.MemStorage.SetGauge(metrics.ID, *metrics.Value)
+		metrics.Value, _ = s.MemStorage.GetGauge(metrics.ID)
+
 	case models.Counter:
-		value, err := strconv.ParseInt(metricValue, 10, 64)
-		if err != nil {
-			http.Error(w, "Bad Request: invalid counter value", http.StatusBadRequest)
+		if metrics.Delta == nil {
+			http.Error(w, "Bad Request: delta is required for counter", http.StatusBadRequest)
 			return
 		}
-		s.MemStorage.AddCounter(metricName, value)
+		s.MemStorage.AddCounter(metrics.ID, *metrics.Delta)
+		metrics.Delta, _ = s.MemStorage.GetCounter(metrics.ID)
+
 	default:
 		http.Error(w, "Bad Request: invalid metric type", http.StatusBadRequest)
 		return
 	}
+	w.Header().Set("Content-Type", "application/json")
 
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "Metrics updated")
+	jsonData, err := json.Marshal(metrics)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Write(jsonData)
 
 }
 
 func (s *Server) GetValue(w http.ResponseWriter, r *http.Request) {
+	var metrics models.Metric
+	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
-	metricType := chi.URLParam(r, "type")
-	metricName := chi.URLParam(r, "name")
-
-	switch models.MetricType(metricType) {
+	switch metrics.MType {
 	case models.Gauge:
-		value, exists := s.MemStorage.GetGauge(metricName)
+		value, exists := s.MemStorage.GetGauge(metrics.ID)
 		if !exists {
 			http.Error(w, "Not Found", http.StatusNotFound)
 			return
 		}
-		helpers.WriteResponse(w, http.StatusOK, value)
+		metrics.Value = value
+
 	case models.Counter:
-		value, exists := s.MemStorage.GetCounter(metricName)
+		value, exists := s.MemStorage.GetCounter(metrics.ID)
 		if !exists {
 			http.Error(w, "Not Found", http.StatusNotFound)
 			return
 		}
-		helpers.WriteResponse(w, http.StatusOK, value)
+		metrics.Delta = value
+
 	default:
 		http.Error(w, "Bad Request: invalid metric type", http.StatusBadRequest)
 		return
 	}
+	w.Header().Set("Content-Type", "application/json")
+	jsonData, err := json.Marshal(metrics)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Write(jsonData)
 
 }
 

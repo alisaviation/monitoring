@@ -27,7 +27,6 @@ func Initialize(level string) error {
 	return nil
 }
 
-// RequestResponseLogger — middleware-логер для входящих HTTP-запросов и исходящих ответов.
 func RequestResponseLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -47,7 +46,6 @@ func RequestResponseLogger(next http.Handler) http.Handler {
 	})
 }
 
-// responseWriter оборачивает http.ResponseWriter для записи статуса и размера ответа.
 type responseWriter struct {
 	http.ResponseWriter
 	statusCode int

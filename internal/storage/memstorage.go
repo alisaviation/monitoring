@@ -1,7 +1,6 @@
 package storage
 
 type MemStorage struct {
-	//mu             sync.RWMutex
 	gauges   map[string]float64
 	counters map[string]int64
 }
@@ -21,14 +20,14 @@ func (m *MemStorage) AddCounter(name string, value int64) {
 	m.counters[name] += value
 }
 
-func (m *MemStorage) GetGauge(name string) (float64, bool) {
+func (m *MemStorage) GetGauge(name string) (*float64, bool) {
 	value, exists := m.gauges[name]
-	return value, exists
+	return &value, exists
 }
 
-func (m *MemStorage) GetCounter(name string) (int64, bool) {
+func (m *MemStorage) GetCounter(name string) (*int64, bool) {
 	value, exists := m.counters[name]
-	return value, exists
+	return &value, exists
 }
 
 func (m *MemStorage) Gauges() map[string]float64 {

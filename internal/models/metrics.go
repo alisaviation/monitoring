@@ -1,16 +1,17 @@
 package models
 
-type MetricType string
+//type MetricType string
 
 const (
-	Gauge   MetricType = "gauge"
-	Counter MetricType = "counter"
+	Gauge   string = "gauge"
+	Counter string = "counter"
 )
 
 type Metric struct {
-	Name  string
-	Value float64
-	Type  MetricType
+	ID    string   `json:"id"`
+	MType string   `json:"type"`
+	Delta *int64   `json:"delta,omitempty"`
+	Value *float64 `json:"value,omitempty"`
 }
 
 const (

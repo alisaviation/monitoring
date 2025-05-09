@@ -5,9 +5,12 @@ import (
 	"strconv"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/alisaviation/monitoring/internal/agent/collector"
 	"github.com/alisaviation/monitoring/internal/agent/sender"
 	"github.com/alisaviation/monitoring/internal/config"
+	"github.com/alisaviation/monitoring/internal/logger"
 
 	"github.com/alisaviation/monitoring/internal/models"
 )
@@ -47,6 +50,14 @@ func main() {
 		case <-reportTicker.C:
 			senderInstance.SendMetrics(metricsBuffer)
 			metricsBuffer = make(map[string]*models.Metric)
+			for name, metric := range metricsBuffer {
+				receivedMetric, err := senderInstance.GetMetric(metric)
+				if err != nil {
+					logger.Log.Error("Error getting metric:", zap.Error(err))
+					continue
+				}
+				metricsBuffer[name] = receivedMetric
+			}
 		}
 	}
 }

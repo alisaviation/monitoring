@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -16,30 +17,34 @@ func TestMethodCheck(t *testing.T) {
 	handler := chi.NewRouter()
 	server := &Server{MemStorage: memStorage}
 
-	handler.Post("/update/{type}/{name}/{value}", helpers.MethodCheck([]string{http.MethodPost})(server.UpdateMetrics))
-	handler.Get("/value/{type}/{name}", helpers.MethodCheck([]string{http.MethodGet})(server.GetValue))
+	handler.Post("/update/", helpers.MethodCheck([]string{http.MethodPost})(server.UpdateMetrics))
+	handler.Post("/value/", helpers.MethodCheck([]string{http.MethodPost})(server.GetValue))
 	handler.Get("/", GetMetricsList(memStorage))
 
 	tests := []struct {
 		name         string
 		method       string
 		url          string
+		body         string
 		expectedCode int
 	}{
-		{"POST Update Gauge", http.MethodPost, "/update/gauge/metric1/123.45", http.StatusOK},
-		{"POST Update Counter", http.MethodPost, "/update/counter/metric2/100", http.StatusOK},
-		{"GET Value Gauge", http.MethodGet, "/value/gauge/metric1", http.StatusOK},
-		{"GET Value Counter", http.MethodGet, "/value/counter/metric2", http.StatusOK},
-		{"GET Metrics List", http.MethodGet, "/", http.StatusOK},
-		{"PUT Method Not Allowed", http.MethodPut, "/update/gauge/metric1/123.45", http.StatusMethodNotAllowed},
-		{"DELETE Method Not Allowed", http.MethodDelete, "/update/gauge/metric1/123.45", http.StatusMethodNotAllowed},
+		{"POST Update Gauge", http.MethodPost, "/update/", `{"id": "metric1", "type": "gauge", "value": 123.45}`, http.StatusOK},
+		{"POST Update Counter", http.MethodPost, "/update/", `{"id": "metric2", "type": "counter", "delta": 100}`, http.StatusOK},
+		{"POST Value Gauge", http.MethodPost, "/value/", `{"id": "metric1", "type": "gauge"}`, http.StatusOK},
+		{"POST Value Counter", http.MethodPost, "/value/", `{"id": "metric2", "type": "counter"}`, http.StatusOK},
+		{"GET Metrics List", http.MethodGet, "/", "", http.StatusOK},
+		{"PUT Method Not Allowed", http.MethodPut, "/update/", "", http.StatusMethodNotAllowed},
+		{"DELETE Method Not Allowed", http.MethodDelete, "/update/", "", http.StatusMethodNotAllowed},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(tt.method, tt.url, nil)
+			var req *http.Request
 			if tt.method == http.MethodPost {
-				req.Header.Set("Content-Type", "text/plain")
+				req = httptest.NewRequest(tt.method, tt.url, bytes.NewBufferString(tt.body))
+				req.Header.Set("Content-Type", "application/json")
+			} else {
+				req = httptest.NewRequest(tt.method, tt.url, nil)
 			}
 			w := httptest.NewRecorder()
 
@@ -64,42 +69,42 @@ func Test_updateMetrics(t *testing.T) {
 		{
 			name:         "Valid Gauge Update",
 			method:       http.MethodPost,
-			url:          "/update/gauge/metric1/123.45",
-			body:         "",
+			url:          "/update/",
+			body:         `{"id": "metric1", "type": "gauge", "value": 123.45}`,
 			expectedCode: http.StatusOK,
-			expectedBody: "Metrics updated",
+			expectedBody: `{"id":"metric1","type":"gauge","value":123.45}`,
 		},
 		{
 			name:         "Valid Counter Update",
 			method:       http.MethodPost,
-			url:          "/update/counter/metric2/100",
-			body:         "",
+			url:          "/update/",
+			body:         `{"id": "metric2", "type": "counter", "delta": 100}`,
 			expectedCode: http.StatusOK,
-			expectedBody: "Metrics updated",
+			expectedBody: `{"id":"metric2","type":"counter","delta":100}`,
 		},
 		{
 			name:         "Invalid Metric Type",
 			method:       http.MethodPost,
-			url:          "/update/invalid/metric1/123.45",
-			body:         "",
+			url:          "/update/",
+			body:         `{"id": "metric1", "type": "invalid", "value": 123.45}`,
 			expectedCode: http.StatusBadRequest,
 			expectedBody: "Bad Request: invalid metric type\n",
 		},
 		{
 			name:         "Invalid Gauge Value",
 			method:       http.MethodPost,
-			url:          "/update/gauge/metric1/invalid",
-			body:         "",
+			url:          "/update/",
+			body:         `{"id": "metric1", "type": "gauge", "value": null}`,
 			expectedCode: http.StatusBadRequest,
-			expectedBody: "Bad Request: invalid gauge value\n",
+			expectedBody: "Bad Request: value is required for gauge\n",
 		},
 		{
 			name:         "Invalid Counter Value",
 			method:       http.MethodPost,
-			url:          "/update/counter/metric2/invalid",
-			body:         "",
+			url:          "/update/",
+			body:         `{"id": "metric2", "type": "counter", "delta": null}`,
 			expectedCode: http.StatusBadRequest,
-			expectedBody: "Bad Request: invalid counter value\n",
+			expectedBody: "Bad Request: delta is required for counter\n",
 		},
 	}
 
@@ -109,14 +114,9 @@ func Test_updateMetrics(t *testing.T) {
 			handler := chi.NewRouter()
 			server := &Server{MemStorage: memStorage}
 
-			handler.Post("/update/{type}/{name}/{value}", helpers.MethodCheck([]string{http.MethodPost})(server.UpdateMetrics))
-			req := httptest.NewRequest(tt.method, tt.url, nil)
-			if tt.method == http.MethodPost {
-				req.Header.Set("Content-Type", "text/plain")
-				if tt.expectedCode == http.StatusUnsupportedMediaType {
-					req.Header.Set("Content-Type", "application/json")
-				}
-			}
+			handler.Post("/update/", helpers.MethodCheck([]string{http.MethodPost})(server.UpdateMetrics))
+			req := httptest.NewRequest(tt.method, tt.url, bytes.NewBufferString(tt.body))
+			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
 			handler.ServeHTTP(w, req)
@@ -131,46 +131,53 @@ func Test_updateMetrics(t *testing.T) {
 		})
 	}
 }
+
 func Test_getValue(t *testing.T) {
 	tests := []struct {
 		name         string
 		method       string
 		url          string
+		body         string
 		expectedCode int
 		expectedBody string
 	}{
 		{
 			name:         "Valid Gauge Get",
-			method:       http.MethodGet,
-			url:          "/value/gauge/metric1",
+			method:       http.MethodPost,
+			url:          "/value/",
+			body:         `{"id": "metric1", "type": "gauge"}`,
 			expectedCode: http.StatusOK,
-			expectedBody: "123.45",
+			expectedBody: `{"id":"metric1","type":"gauge","value":123.45}`,
 		},
 		{
 			name:         "Valid Counter Get",
-			method:       http.MethodGet,
-			url:          "/value/counter/metric2",
+			method:       http.MethodPost,
+			url:          "/value/",
+			body:         `{"id": "metric2", "type": "counter"}`,
 			expectedCode: http.StatusOK,
-			expectedBody: "100",
+			expectedBody: `{"id":"metric2","type":"counter","delta":100}`,
 		},
 		{
 			name:         "Invalid Metric Type",
-			method:       http.MethodGet,
-			url:          "/value/invalid/metric1",
+			method:       http.MethodPost,
+			url:          "/value/",
+			body:         `{"id": "metric1", "type": "invalid"}`,
 			expectedCode: http.StatusBadRequest,
 			expectedBody: "Bad Request: invalid metric type\n",
 		},
 		{
 			name:         "Gauge Not Found",
-			method:       http.MethodGet,
-			url:          "/value/gauge/nonexistent",
+			method:       http.MethodPost,
+			url:          "/value/",
+			body:         `{"id": "nonexistent", "type": "gauge"}`,
 			expectedCode: http.StatusNotFound,
 			expectedBody: "Not Found\n",
 		},
 		{
 			name:         "Counter Not Found",
-			method:       http.MethodGet,
-			url:          "/value/counter/nonexistent",
+			method:       http.MethodPost,
+			url:          "/value/",
+			body:         `{"id": "nonexistent", "type": "counter"}`,
 			expectedCode: http.StatusNotFound,
 			expectedBody: "Not Found\n",
 		},
@@ -184,9 +191,10 @@ func Test_getValue(t *testing.T) {
 
 			server := &Server{MemStorage: memStorage}
 			handler := chi.NewRouter()
-			handler.Get("/value/{type}/{name}", helpers.MethodCheck([]string{http.MethodGet})(server.GetValue))
+			handler.Post("/value/", helpers.MethodCheck([]string{http.MethodPost})(server.GetValue))
 
-			req := httptest.NewRequest(tt.method, tt.url, nil)
+			req := httptest.NewRequest(tt.method, tt.url, bytes.NewBufferString(tt.body))
+			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
 			handler.ServeHTTP(w, req)
