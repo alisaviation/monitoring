@@ -2,12 +2,18 @@ package server
 
 import (
 	"bytes"
+	"compress/gzip"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/stretchr/testify/require"
 
+	"github.com/alisaviation/monitoring/internal/middleware"
+	"github.com/alisaviation/monitoring/internal/models"
 	"github.com/alisaviation/monitoring/internal/server/helpers"
 	"github.com/alisaviation/monitoring/internal/storage"
 )
@@ -19,7 +25,7 @@ func TestMethodCheck(t *testing.T) {
 
 	handler.Post("/update/", helpers.MethodCheck([]string{http.MethodPost})(server.UpdateMetrics))
 	handler.Post("/value/", helpers.MethodCheck([]string{http.MethodPost})(server.GetValue))
-	handler.Get("/", GetMetricsList(memStorage))
+	handler.Get("/", helpers.MethodCheck([]string{http.MethodGet})(server.GetMetricsList))
 
 	tests := []struct {
 		name         string
@@ -208,4 +214,168 @@ func Test_getValue(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGzipSupport(t *testing.T) {
+
+	memStorage := storage.NewMemStorage()
+	srv := &Server{MemStorage: memStorage}
+	memStorage.SetGauge("test_gauge", 123.45)
+	memStorage.AddCounter("test_counter", 42)
+
+	testCases := []struct {
+		name        string
+		method      string
+		path        string
+		contentType string
+		body        interface{}
+	}{
+		{
+			name:        "Update Gauge",
+			method:      "POST",
+			path:        "/update/",
+			contentType: "application/json",
+			body: models.Metric{
+				ID:    "new_gauge",
+				MType: models.Gauge,
+				Value: pointer(56.78),
+			},
+		},
+		{
+			name:        "Update Counter",
+			method:      "POST",
+			path:        "/update/",
+			contentType: "application/json",
+			body: models.Metric{
+				ID:    "new_counter",
+				MType: models.Counter,
+				Delta: pointer(int64(10)),
+			},
+		},
+		{
+			name:        "Get Value (Gauge)",
+			method:      "POST",
+			path:        "/value/",
+			contentType: "application/json",
+			body: models.Metric{
+				ID:    "test_gauge",
+				MType: models.Gauge,
+			},
+		},
+		{
+			name:        "Get Value (Counter)",
+			method:      "POST",
+			path:        "/value/",
+			contentType: "application/json",
+			body: models.Metric{
+				ID:    "test_counter",
+				MType: models.Counter,
+			},
+		},
+		{
+			name:   "Get Metrics List",
+			method: "GET",
+			path:   "/",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name+" with gzip request", func(t *testing.T) {
+			testGzipRequest(t, srv, tc.method, tc.path, tc.contentType, tc.body)
+		})
+
+		t.Run(tc.name+" with gzip response", func(t *testing.T) {
+			testGzipResponse(t, srv, tc.method, tc.path, tc.contentType, tc.body)
+		})
+	}
+}
+
+func testGzipRequest(t *testing.T, srv *Server, method, path, contentType string, body interface{}) {
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+
+	var bodyData []byte
+	if body != nil {
+		var err error
+		bodyData, err = json.Marshal(body)
+		require.NoError(t, err)
+	}
+
+	_, err := gz.Write(bodyData)
+	require.NoError(t, err)
+	require.NoError(t, gz.Close())
+
+	req := httptest.NewRequest(method, path, &buf)
+	req.Header.Set("Content-Encoding", "gzip")
+	req.Header.Set("Content-Type", contentType)
+	req.Header.Set("Accept-Encoding", "gzip")
+
+	w := httptest.NewRecorder()
+
+	// Применяем middleware и выполняем запрос
+	handler := middleware.GzipMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch path {
+		case "/update/":
+			srv.UpdateMetrics(w, r)
+		case "/value/":
+			srv.GetValue(w, r)
+		case "/":
+			srv.GetMetricsList(w, r)
+		}
+	}))
+
+	handler.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func testGzipResponse(t *testing.T, srv *Server, method, path, contentType string, body interface{}) {
+	var bodyData []byte
+	if body != nil {
+		var err error
+		bodyData, err = json.Marshal(body)
+		require.NoError(t, err)
+	}
+
+	req := httptest.NewRequest(method, path, bytes.NewReader(bodyData))
+	req.Header.Set("Accept-Encoding", "gzip")
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+
+	w := httptest.NewRecorder()
+
+	// Применяем middleware и выполняем запрос
+	handler := middleware.GzipMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch path {
+		case "/update/":
+			srv.UpdateMetrics(w, r)
+		case "/value/":
+			srv.GetValue(w, r)
+		case "/":
+			srv.GetMetricsList(w, r)
+		}
+	}))
+
+	handler.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Equal(t, "gzip", resp.Header.Get("Content-Encoding"))
+
+	gz, err := gzip.NewReader(resp.Body)
+	require.NoError(t, err)
+	defer gz.Close()
+
+	_, err = io.ReadAll(gz)
+	require.NoError(t, err)
+}
+
+func pointer[T any](v T) *T {
+	return &v
 }
