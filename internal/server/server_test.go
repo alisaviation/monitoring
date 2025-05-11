@@ -312,7 +312,6 @@ func testGzipRequest(t *testing.T, srv *Server, method, path, contentType string
 
 	w := httptest.NewRecorder()
 
-	// Применяем middleware и выполняем запрос
 	handler := middleware.GzipMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch path {
 		case "/update/":
@@ -348,7 +347,6 @@ func testGzipResponse(t *testing.T, srv *Server, method, path, contentType strin
 
 	w := httptest.NewRecorder()
 
-	// Применяем middleware и выполняем запрос
 	handler := middleware.GzipMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch path {
 		case "/update/":
