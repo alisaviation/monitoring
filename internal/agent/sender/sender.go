@@ -1,6 +1,8 @@
 package sender
 
 import (
+	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"net/http"
 
@@ -17,10 +19,24 @@ type Sender struct {
 }
 
 func NewSender(serverAddress string) *Sender {
+	client := resty.New()
+	client.SetHeader("Accept-Encoding", "gzip")
 	return &Sender{
 		serverAddress: serverAddress,
-		client:        resty.New(),
+		client:        client,
 	}
+}
+
+func (s *Sender) compressData(data []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	if _, err := gz.Write(data); err != nil {
+		return nil, err
+	}
+	if err := gz.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func (s *Sender) SendMetrics(metrics map[string]*models.Metric) {
@@ -42,9 +58,16 @@ func (s *Sender) SendMetrics(metrics map[string]*models.Metric) {
 			continue
 		}
 
+		compressedData, err := s.compressData(jsonData)
+		if err != nil {
+			logger.Log.Error("Error compressing data", zap.Error(err))
+			continue
+		}
+
 		resp, err := s.client.R().
 			SetHeader("Content-Type", "application/json").
-			SetBody(jsonData).
+			SetHeader("Content-Encoding", "gzip").
+			SetBody(compressedData).
 			Post("http://" + s.serverAddress + "/update/")
 		if err != nil {
 			logger.Log.Error("Error sending request", zap.Error(err))
@@ -68,9 +91,16 @@ func (s *Sender) GetMetric(metric *models.Metric) (*models.Metric, error) {
 		return nil, err
 	}
 
+	compressedData, err := s.compressData(jsonData)
+	if err != nil {
+		logger.Log.Error("Error compressing data", zap.Error(err))
+		return nil, err
+	}
+
 	resp, err := s.client.R().
 		SetHeader("Content-Type", "application/json").
-		SetBody(jsonData).
+		SetHeader("Content-Encoding", "gzip").
+		SetBody(compressedData).
 		Post("http://" + s.serverAddress + "/value/")
 	if err != nil {
 		logger.Log.Error("Error sending request", zap.Error(err))

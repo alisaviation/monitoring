@@ -44,14 +44,12 @@ func (s *Server) UpdateMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-
 	jsonData, err := json.Marshal(metrics)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.Write(jsonData)
-
 }
 
 func (s *Server) GetValue(w http.ResponseWriter, r *http.Request) {
@@ -92,20 +90,23 @@ func (s *Server) GetValue(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func GetMetricsList(memStorage *storage.MemStorage) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
+func (s *Server) GetMetricsList(w http.ResponseWriter, r *http.Request) {
+	var response strings.Builder
 
-		var response strings.Builder
-		response.WriteString("<html><body><h1>Metrics</h1><ul>")
-		for name, value := range memStorage.Gauges() {
-			response.WriteString(fmt.Sprintf("<li>%s: %s</li>", name, helpers.FormatFloat(value)))
-		}
-		for name, value := range memStorage.Counters() {
-			response.WriteString(fmt.Sprintf("<li>%s: %d</li>", name, value))
-		}
-		response.WriteString("</ul></body></html>")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(response.String()))
+	response.WriteString("<html><body><h1>Metrics</h1><ul>")
+
+	for name, value := range s.MemStorage.Gauges() {
+		response.WriteString(fmt.Sprintf("<li>%s: %s</li>", name, helpers.FormatFloat(value)))
 	}
+
+	for name, value := range s.MemStorage.Counters() {
+		response.WriteString(fmt.Sprintf("<li>%s: %d</li>", name, value))
+	}
+
+	response.WriteString("</ul></body></html>")
+
+	w.Header().Set("Content-Type", "text/html")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(response.String()))
+
 }

@@ -13,12 +13,14 @@ post {
 headers {
   Content-Length: 0
   Content-Type: application/json
+  ~Content-Encoding: gzip
+  ~Accept-Encoding: gzip
 }
 
 body:json {
   {
-    "id": "Mallocs1",
-    "type": "gauge",
-    "value": 123.45
+    "id": "PollCount",
+    "type": "counter",
+    "value": 12
   }
 }

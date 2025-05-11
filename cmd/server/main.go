@@ -10,6 +10,7 @@ import (
 
 	"github.com/alisaviation/monitoring/internal/config"
 	"github.com/alisaviation/monitoring/internal/logger"
+	"github.com/alisaviation/monitoring/internal/middleware"
 	"github.com/alisaviation/monitoring/internal/server"
 	"github.com/alisaviation/monitoring/internal/server/helpers"
 	"github.com/alisaviation/monitoring/internal/storage"
@@ -38,10 +39,12 @@ func run(memStorage *storage.MemStorage, addr string) error {
 	srvr := &server.Server{MemStorage: memStorage}
 	r := chi.NewRouter()
 	r.Use(logger.RequestResponseLogger)
+	r.Use(middleware.GzipMiddleware)
+
 	r.Post("/update/", helpers.MethodCheck([]string{http.MethodPost})(srvr.UpdateMetrics))
 	r.Get("/value/", helpers.MethodCheck([]string{http.MethodGet})(srvr.GetValue))
 	r.Post("/value/", helpers.MethodCheck([]string{http.MethodPost})(srvr.GetValue))
-	r.Get("/", server.GetMetricsList(memStorage))
+	r.Get("/", helpers.MethodCheck([]string{http.MethodGet})(srvr.GetMetricsList))
 
 	return http.ListenAndServe(addr, r)
 }

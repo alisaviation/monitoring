@@ -6,20 +6,6 @@ import (
 	"strings"
 )
 
-func WriteResponse(w http.ResponseWriter, statusCode int, body interface{}) {
-	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(statusCode)
-
-	switch v := body.(type) {
-	case float64:
-		fmt.Fprintf(w, "%s", FormatFloat(v))
-	case int64:
-		fmt.Fprintf(w, "%d", v)
-	default:
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-	}
-}
-
 func MethodCheck(methods []string) func(next http.HandlerFunc) http.HandlerFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
