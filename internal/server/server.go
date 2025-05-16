@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
+
+	"github.com/go-chi/chi/v5"
 
 	"github.com/alisaviation/monitoring/internal/config"
 	"github.com/alisaviation/monitoring/internal/helpers"
@@ -26,10 +29,24 @@ func (s *Server) UpdateMetrics(w http.ResponseWriter, r *http.Request) {
 			}
 		}()
 	}
+	contentType := r.Header.Get("Content-Type")
+	switch {
+	case strings.Contains(contentType, "application/json"):
+		s.UpdateJSONMetrics(w, r)
+	case strings.Contains(contentType, "text/plain"):
+		s.UpdateTextMetrics(w, r)
+	case contentType == "":
+		s.UpdateTextMetrics(w, r)
+	default:
+		http.Error(w, "Unsupported Content-Type", http.StatusUnsupportedMediaType)
+	}
 
+}
+
+func (s *Server) UpdateJSONMetrics(w http.ResponseWriter, r *http.Request) {
 	var metrics models.Metric
 	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "Bad Request: invalid JSON", http.StatusBadRequest)
 		return
 	}
 
@@ -58,34 +75,34 @@ func (s *Server) UpdateMetrics(w http.ResponseWriter, r *http.Request) {
 	jsonData, err := json.Marshal(metrics)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
 	}
 	w.Write(jsonData)
 }
+func (s *Server) UpdateTextMetrics(w http.ResponseWriter, r *http.Request) {
+	valueStr := chi.URLParam(r, "value")
 
-func (s *Server) GetValue(w http.ResponseWriter, r *http.Request) {
 	var metrics models.Metric
-	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	metrics.ID = chi.URLParam(r, "name")
+	metrics.MType = chi.URLParam(r, "type")
 
 	switch metrics.MType {
 	case models.Gauge:
-		value, exists := s.MemStorage.GetGauge(metrics.ID)
-		if !exists {
-			http.Error(w, "Not Found", http.StatusNotFound)
+		value, err := strconv.ParseFloat(valueStr, 64)
+		if err != nil {
+			http.Error(w, "Bad Request: invalid gauge value", http.StatusBadRequest)
 			return
 		}
-		metrics.Value = value
+		metrics.Value = &value
+		s.MemStorage.SetGauge(metrics.ID, value)
 
 	case models.Counter:
-		value, exists := s.MemStorage.GetCounter(metrics.ID)
-		if !exists {
-			http.Error(w, "Not Found", http.StatusNotFound)
+		delta, err := strconv.ParseInt(valueStr, 10, 64)
+		if err != nil {
+			http.Error(w, "Bad Request: invalid counter value", http.StatusBadRequest)
 			return
 		}
-		metrics.Delta = value
+		metrics.Delta = &delta
+		s.MemStorage.AddCounter(metrics.ID, delta)
 
 	default:
 		http.Error(w, "Bad Request: invalid metric type", http.StatusBadRequest)
@@ -95,10 +112,108 @@ func (s *Server) GetValue(w http.ResponseWriter, r *http.Request) {
 	jsonData, err := json.Marshal(metrics)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+
 	}
 	w.Write(jsonData)
+}
+func (s *Server) GetValue(w http.ResponseWriter, r *http.Request) {
+	contentType := r.Header.Get("Content-Type")
+	var response interface{}
 
+	switch {
+	case strings.Contains(contentType, "application/json"):
+		metrics := s.GetJSONValue(w, r)
+		if metrics.ID == "" {
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		jsonData, err := json.Marshal(metrics)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Write(jsonData)
+		return
+	default:
+		metrics := s.GetTextValue(w, r)
+		if metrics.ID == "" {
+			return
+		}
+		switch metrics.MType {
+		case models.Gauge:
+			if metrics.Value != nil {
+				response = *metrics.Value
+			}
+		case models.Counter:
+			if metrics.Delta != nil {
+				response = *metrics.Delta
+			}
+		}
+	}
+
+	if response == nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	fmt.Fprint(w, response)
+}
+
+func (s *Server) GetJSONValue(w http.ResponseWriter, r *http.Request) models.Metric {
+	var metrics models.Metric
+	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return models.Metric{}
+	}
+
+	switch metrics.MType {
+	case models.Gauge:
+		value, exists := s.MemStorage.GetGauge(metrics.ID)
+		if !exists {
+			http.Error(w, "Not Found", http.StatusNotFound)
+			return models.Metric{}
+		}
+		metrics.Value = value
+	case models.Counter:
+		delta, exists := s.MemStorage.GetCounter(metrics.ID)
+		if !exists {
+			http.Error(w, "Not Found", http.StatusNotFound)
+			return models.Metric{}
+		}
+		metrics.Delta = delta
+	default:
+		http.Error(w, "Bad Request: invalid metric type", http.StatusBadRequest)
+	}
+	return metrics
+}
+
+func (s *Server) GetTextValue(w http.ResponseWriter, r *http.Request) models.Metric {
+	var metrics models.Metric
+
+	metrics.ID = chi.URLParam(r, "name")
+	metrics.MType = chi.URLParam(r, "type")
+
+	switch metrics.MType {
+	case models.Gauge:
+		value, exists := s.MemStorage.GetGauge(metrics.ID)
+		if !exists {
+			http.Error(w, "Not Found", http.StatusNotFound)
+			return models.Metric{}
+		}
+		metrics.Value = value
+	case models.Counter:
+		delta, exists := s.MemStorage.GetCounter(metrics.ID)
+		if !exists {
+			http.Error(w, "Not Found", http.StatusNotFound)
+			return models.Metric{}
+		}
+		metrics.Delta = delta
+	default:
+		http.Error(w, "Bad Request: invalid metric type", http.StatusBadRequest)
+		return models.Metric{}
+	}
+	return metrics
 }
 
 func (s *Server) GetMetricsList(w http.ResponseWriter, r *http.Request) {

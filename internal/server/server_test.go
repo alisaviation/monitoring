@@ -190,7 +190,7 @@ func Test_getValue(t *testing.T) {
 			url:          "/value/",
 			body:         `{"id": "metric1", "type": "invalid"}`,
 			expectedCode: http.StatusBadRequest,
-			expectedBody: "Bad Request: invalid metric type\n",
+			expectedBody: "Bad Request: invalid metric type\n{\"id\":\"metric1\",\"type\":\"invalid\"}",
 		},
 		{
 			name:         "Gauge Not Found",
@@ -256,12 +256,27 @@ func Test_getValue(t *testing.T) {
 }
 
 func Test_gzipSupport(t *testing.T) {
-	conf := config.SetConfigServer()
+	//conf := config.SetConfigServer()
 	memStorage := storage.NewMemStorage()
-	srv := &Server{MemStorage: memStorage, Config: conf}
 	memStorage.SetGauge("test_gauge", 123.45)
 	memStorage.AddCounter("test_counter", 42)
+	flagSet := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
 
+	var conf config.Server
+	conf.ServerAddress = "localhost:8080"
+	conf.StoreInterval = 300
+	conf.FileStoragePath = "metrics.json"
+	conf.Restore = false
+
+	flagSet.StringVar(&conf.ServerAddress, "a", conf.ServerAddress, "Server address")
+	flagSet.IntVar(&conf.StoreInterval, "i", conf.StoreInterval, "Interval in seconds to store metrics")
+	flagSet.StringVar(&conf.FileStoragePath, "f", conf.FileStoragePath, "File path")
+	flagSet.BoolVar(&conf.Restore, "r", conf.Restore, "Restore metrics from file on start")
+	err := flagSet.Parse([]string{"-a", "localhost:8080", "-i", "300", "-f", "metrics.json", "-r", "false"})
+	if err != nil {
+		t.Fatalf("Error parsing flags: %v", err)
+	}
+	srv := &Server{MemStorage: memStorage, Config: conf}
 	testCases := []struct {
 		name        string
 		method      string
