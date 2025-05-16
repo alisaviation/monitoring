@@ -38,9 +38,12 @@ func run(memStorage *storage.MemStorage, addr string) error {
 	srvr := &server.Server{MemStorage: memStorage}
 	r := chi.NewRouter()
 	r.Use(logger.RequestResponseLogger)
+	r.Post("/update/{type}/{name}/{value}", helpers.MethodCheck([]string{http.MethodPost})(srvr.UpdateMetrics))
 	r.Post("/update/", helpers.MethodCheck([]string{http.MethodPost})(srvr.UpdateMetrics))
-	r.Get("/value/", helpers.MethodCheck([]string{http.MethodGet})(srvr.GetValue))
 	r.Post("/value/", helpers.MethodCheck([]string{http.MethodPost})(srvr.GetValue))
+	r.Get("/value/{type}/{name}", helpers.MethodCheck([]string{http.MethodGet})(srvr.GetValue))
+	r.Get("/value/", helpers.MethodCheck([]string{http.MethodGet})(srvr.GetValue))
+
 	r.Get("/", server.GetMetricsList(memStorage))
 
 	return http.ListenAndServe(addr, r)

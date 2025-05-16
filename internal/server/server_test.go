@@ -2,8 +2,10 @@ package server
 
 import (
 	"bytes"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -17,6 +19,8 @@ func TestMethodCheck(t *testing.T) {
 	handler := chi.NewRouter()
 	server := &Server{MemStorage: memStorage}
 
+	handler.Post("/update/{type}/{name}/{value}", helpers.MethodCheck([]string{http.MethodPost})(server.UpdateMetrics))
+	handler.Get("/value/{type}/{name}", helpers.MethodCheck([]string{http.MethodGet})(server.GetValue))
 	handler.Post("/update/", helpers.MethodCheck([]string{http.MethodPost})(server.UpdateMetrics))
 	handler.Post("/value/", helpers.MethodCheck([]string{http.MethodPost})(server.GetValue))
 	handler.Get("/", GetMetricsList(memStorage))
@@ -42,9 +46,22 @@ func TestMethodCheck(t *testing.T) {
 			var req *http.Request
 			if tt.method == http.MethodPost {
 				req = httptest.NewRequest(tt.method, tt.url, bytes.NewBufferString(tt.body))
-				req.Header.Set("Content-Type", "application/json")
+
+				if strings.Contains(tt.url, "/update/") {
+					req.Header.Set("Content-Type", "application/json")
+				} else if strings.Contains(tt.url, "/value/") {
+					if strings.Contains(tt.body, "/") {
+						req.Header.Set("Content-Type", "text/plain")
+					} else {
+						req.Header.Set("Content-Type", "application/json")
+					}
+				}
 			} else {
 				req = httptest.NewRequest(tt.method, tt.url, nil)
+				if tt.body != "" {
+					req.Header.Set("Content-Type", "text/plain")
+					req.Body = io.NopCloser(bytes.NewBufferString(tt.body))
+				}
 			}
 			w := httptest.NewRecorder()
 
@@ -63,6 +80,7 @@ func Test_updateMetrics(t *testing.T) {
 		method       string
 		url          string
 		body         string
+		contentType  string
 		expectedCode int
 		expectedBody string
 	}{
@@ -71,6 +89,7 @@ func Test_updateMetrics(t *testing.T) {
 			method:       http.MethodPost,
 			url:          "/update/",
 			body:         `{"id": "metric1", "type": "gauge", "value": 123.45}`,
+			contentType:  "application/json",
 			expectedCode: http.StatusOK,
 			expectedBody: `{"id":"metric1","type":"gauge","value":123.45}`,
 		},
@@ -79,6 +98,7 @@ func Test_updateMetrics(t *testing.T) {
 			method:       http.MethodPost,
 			url:          "/update/",
 			body:         `{"id": "metric2", "type": "counter", "delta": 100}`,
+			contentType:  "application/json",
 			expectedCode: http.StatusOK,
 			expectedBody: `{"id":"metric2","type":"counter","delta":100}`,
 		},
@@ -87,6 +107,7 @@ func Test_updateMetrics(t *testing.T) {
 			method:       http.MethodPost,
 			url:          "/update/",
 			body:         `{"id": "metric1", "type": "invalid", "value": 123.45}`,
+			contentType:  "application/json",
 			expectedCode: http.StatusBadRequest,
 			expectedBody: "Bad Request: invalid metric type\n",
 		},
@@ -95,6 +116,7 @@ func Test_updateMetrics(t *testing.T) {
 			method:       http.MethodPost,
 			url:          "/update/",
 			body:         `{"id": "metric1", "type": "gauge", "value": null}`,
+			contentType:  "application/json",
 			expectedCode: http.StatusBadRequest,
 			expectedBody: "Bad Request: value is required for gauge\n",
 		},
@@ -103,6 +125,7 @@ func Test_updateMetrics(t *testing.T) {
 			method:       http.MethodPost,
 			url:          "/update/",
 			body:         `{"id": "metric2", "type": "counter", "delta": null}`,
+			contentType:  "application/json",
 			expectedCode: http.StatusBadRequest,
 			expectedBody: "Bad Request: delta is required for counter\n",
 		},
@@ -115,8 +138,9 @@ func Test_updateMetrics(t *testing.T) {
 			server := &Server{MemStorage: memStorage}
 
 			handler.Post("/update/", helpers.MethodCheck([]string{http.MethodPost})(server.UpdateMetrics))
+			handler.Post("/update/{type}/{name}/{value}", helpers.MethodCheck([]string{http.MethodPost})(server.UpdateMetrics))
 			req := httptest.NewRequest(tt.method, tt.url, bytes.NewBufferString(tt.body))
-			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Content-Type", tt.contentType)
 			w := httptest.NewRecorder()
 
 			handler.ServeHTTP(w, req)
@@ -163,7 +187,7 @@ func Test_getValue(t *testing.T) {
 			url:          "/value/",
 			body:         `{"id": "metric1", "type": "invalid"}`,
 			expectedCode: http.StatusBadRequest,
-			expectedBody: "Bad Request: invalid metric type\n",
+			expectedBody: "Bad Request: invalid metric type\n{\"id\":\"metric1\",\"type\":\"invalid\"}",
 		},
 		{
 			name:         "Gauge Not Found",
