@@ -1,7 +1,5 @@
 package models
 
-//type MetricType string
-
 const (
 	Gauge   string = "gauge"
 	Counter string = "counter"

@@ -41,6 +41,8 @@ func run(memStorage *storage.MemStorage, addr string) error {
 	r.Use(logger.RequestResponseLogger)
 	r.Use(middleware.GzipMiddleware)
 
+	r.Post("/update/{type}/{name}/{value}", helpers.MethodCheck([]string{http.MethodPost})(srvr.UpdateMetrics))
+	r.Get("/value/{type}/{name}", helpers.MethodCheck([]string{http.MethodGet})(srvr.GetValue))
 	r.Post("/update/", helpers.MethodCheck([]string{http.MethodPost})(srvr.UpdateMetrics))
 	r.Get("/value/", helpers.MethodCheck([]string{http.MethodGet})(srvr.GetValue))
 	r.Post("/value/", helpers.MethodCheck([]string{http.MethodPost})(srvr.GetValue))

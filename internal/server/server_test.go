@@ -169,7 +169,7 @@ func Test_getValue(t *testing.T) {
 			url:          "/value/",
 			body:         `{"id": "metric1", "type": "invalid"}`,
 			expectedCode: http.StatusBadRequest,
-			expectedBody: "Bad Request: invalid metric type\n",
+			expectedBody: "Bad Request: invalid metric type\n{\"id\":\"metric1\",\"type\":\"invalid\"}",
 		},
 		{
 			name:         "Gauge Not Found",
