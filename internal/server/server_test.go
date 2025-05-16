@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"flag"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,19 +13,22 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
 
+	"github.com/alisaviation/monitoring/internal/config"
+	"github.com/alisaviation/monitoring/internal/helpers"
 	"github.com/alisaviation/monitoring/internal/middleware"
 	"github.com/alisaviation/monitoring/internal/models"
-	"github.com/alisaviation/monitoring/internal/server/helpers"
 	"github.com/alisaviation/monitoring/internal/storage"
 )
 
-func TestMethodCheck(t *testing.T) {
+func Test_methodCheck(t *testing.T) {
 	memStorage := storage.NewMemStorage()
 	handler := chi.NewRouter()
-	server := &Server{MemStorage: memStorage}
+	conf := config.SetConfigServer()
+	server := &Server{MemStorage: memStorage, Config: conf}
 
 	handler.Post("/update/", helpers.MethodCheck([]string{http.MethodPost})(server.UpdateMetrics))
 	handler.Post("/value/", helpers.MethodCheck([]string{http.MethodPost})(server.GetValue))
+	handler.Get("/value/", helpers.MethodCheck([]string{http.MethodGet})(server.GetValue))
 	handler.Get("/", helpers.MethodCheck([]string{http.MethodGet})(server.GetMetricsList))
 
 	tests := []struct {
@@ -117,8 +121,25 @@ func Test_updateMetrics(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			memStorage := storage.NewMemStorage()
+
 			handler := chi.NewRouter()
-			server := &Server{MemStorage: memStorage}
+			flagSet := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
+			var conf config.Server
+			conf.ServerAddress = "localhost:8080"
+			conf.StoreInterval = 300
+			conf.FileStoragePath = "metrics.json"
+			conf.Restore = false
+
+			flagSet.StringVar(&conf.ServerAddress, "a", conf.ServerAddress, "Server address")
+			flagSet.IntVar(&conf.StoreInterval, "i", conf.StoreInterval, "Interval in seconds to store metrics")
+			flagSet.StringVar(&conf.FileStoragePath, "f", conf.FileStoragePath, "File path")
+			flagSet.BoolVar(&conf.Restore, "r", conf.Restore, "Restore metrics from file on start")
+
+			err := flagSet.Parse([]string{})
+			if err != nil {
+				t.Fatalf("Error parsing flags: %v", err)
+			}
+			server := &Server{MemStorage: memStorage, Config: conf}
 
 			handler.Post("/update/", helpers.MethodCheck([]string{http.MethodPost})(server.UpdateMetrics))
 			req := httptest.NewRequest(tt.method, tt.url, bytes.NewBufferString(tt.body))
@@ -194,8 +215,26 @@ func Test_getValue(t *testing.T) {
 			memStorage := storage.NewMemStorage()
 			memStorage.SetGauge("metric1", 123.45)
 			memStorage.AddCounter("metric2", 100)
+			flagSet := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
 
-			server := &Server{MemStorage: memStorage}
+			var conf config.Server
+			conf.ServerAddress = "localhost:8080"
+			conf.StoreInterval = 300
+			conf.FileStoragePath = "metrics.json"
+			conf.Restore = false
+
+			flagSet.StringVar(&conf.ServerAddress, "a", conf.ServerAddress, "Server address")
+			flagSet.IntVar(&conf.StoreInterval, "i", conf.StoreInterval, "Interval in seconds to store metrics")
+			flagSet.StringVar(&conf.FileStoragePath, "f", conf.FileStoragePath, "File path")
+			flagSet.BoolVar(&conf.Restore, "r", conf.Restore, "Restore metrics from file on start")
+
+			err := flagSet.Parse([]string{})
+			if err != nil {
+				t.Fatalf("Error parsing flags: %v", err)
+			}
+
+			server := &Server{MemStorage: memStorage, Config: conf}
+
 			handler := chi.NewRouter()
 			handler.Post("/value/", helpers.MethodCheck([]string{http.MethodPost})(server.GetValue))
 
@@ -216,10 +255,10 @@ func Test_getValue(t *testing.T) {
 	}
 }
 
-func TestGzipSupport(t *testing.T) {
-
+func Test_gzipSupport(t *testing.T) {
+	conf := config.SetConfigServer()
 	memStorage := storage.NewMemStorage()
-	srv := &Server{MemStorage: memStorage}
+	srv := &Server{MemStorage: memStorage, Config: conf}
 	memStorage.SetGauge("test_gauge", 123.45)
 	memStorage.AddCounter("test_counter", 42)
 

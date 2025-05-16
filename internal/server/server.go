@@ -3,19 +3,30 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
+	"github.com/alisaviation/monitoring/internal/config"
+	"github.com/alisaviation/monitoring/internal/helpers"
 	"github.com/alisaviation/monitoring/internal/models"
-	"github.com/alisaviation/monitoring/internal/server/helpers"
 	"github.com/alisaviation/monitoring/internal/storage"
 )
 
 type Server struct {
 	MemStorage *storage.MemStorage
+	Config     config.Server
 }
 
 func (s *Server) UpdateMetrics(w http.ResponseWriter, r *http.Request) {
+	if s.Config.StoreInterval == 0 {
+		defer func() {
+			if err := s.MemStorage.Save(s.Config.FileStoragePath); err != nil {
+				log.Fatalf("Error saving metrics: %v", err)
+			}
+		}()
+	}
+
 	var metrics models.Metric
 	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

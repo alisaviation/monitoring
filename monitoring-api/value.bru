@@ -12,11 +12,17 @@ get {
 
 headers {
   Content-Type: application/json
+  Accept-Encoding: gzip
+  ~Content-Encoding: gzip
 }
 
 body:json {
+  // {
+    // "id": "Mallocs",
+    // "type": "gauge"
+  // }
   {
-    "id": "Mallocs",
-    "type": "gauge"
+    "id": "PollCount",
+    "type": "counter"
   }
 }
