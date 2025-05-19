@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -15,96 +16,20 @@ import (
 )
 
 type Server struct {
-	MemStorage *storage.MemStorage
+	MemStorage    *storage.MemStorage
+	storeInterval time.Duration
 }
 
-//	func (s *Server) UpdateMetrics(w http.ResponseWriter, r *http.Request) {
-//		var metrics models.Metric
-//		if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
-//			http.Error(w, err.Error(), http.StatusBadRequest)
-//			return
-//		}
-//
-//		switch metrics.MType {
-//		case models.Gauge:
-//			if metrics.Value == nil {
-//				http.Error(w, "Bad Request: value is required for gauge", http.StatusBadRequest)
-//				return
-//			}
-//			s.MemStorage.SetGauge(metrics.ID, *metrics.Value)
-//			metrics.Value, _ = s.MemStorage.GetGauge(metrics.ID)
-//
-//		case models.Counter:
-//			if metrics.Delta == nil {
-//				http.Error(w, "Bad Request: delta is required for counter", http.StatusBadRequest)
-//				return
-//			}
-//			s.MemStorage.AddCounter(metrics.ID, *metrics.Delta)
-//			metrics.Delta, _ = s.MemStorage.GetCounter(metrics.ID)
-//
-//		default:
-//			http.Error(w, "Bad Request: invalid metric type", http.StatusBadRequest)
-//			return
-//		}
-//		w.Header().Set("Content-Type", "application/json")
-//		jsonData, err := json.Marshal(metrics)
-//		if err != nil {
-//			http.Error(w, err.Error(), http.StatusInternalServerError)
-//			return
-//		}
-//		w.Write(jsonData)
-//	}
-//
-//	func (s *Server) GetValue(w http.ResponseWriter, r *http.Request) {
-//		var metrics models.Metric
-//		if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
-//			http.Error(w, err.Error(), http.StatusBadRequest)
-//			return
-//		}
-//
-//		switch metrics.MType {
-//		case models.Gauge:
-//			value, exists := s.MemStorage.GetGauge(metrics.ID)
-//			if !exists {
-//				http.Error(w, "Not Found", http.StatusNotFound)
-//				return
-//			}
-//			metrics.Value = value
-//
-//		case models.Counter:
-//			value, exists := s.MemStorage.GetCounter(metrics.ID)
-//			if !exists {
-//				http.Error(w, "Not Found", http.StatusNotFound)
-//				return
-//			}
-//			metrics.Delta = value
-//
-//		default:
-//			http.Error(w, "Bad Request: invalid metric type", http.StatusBadRequest)
-//			return
-//		}
-//		w.Header().Set("Content-Type", "application/json")
-//		jsonData, err := json.Marshal(metrics)
-//		if err != nil {
-//			http.Error(w, err.Error(), http.StatusInternalServerError)
-//			return
-//		}
-//		w.Write(jsonData)
-//
-// }
 func (s *Server) UpdateMetrics(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
 	switch {
 	case strings.Contains(contentType, "application/json"):
 		s.UpdateJSONMetrics(w, r)
-	case strings.Contains(contentType, "text/plain"):
-		s.UpdateTextMetrics(w, r)
-	case contentType == "":
+	case strings.Contains(contentType, "text/plain"), contentType == "":
 		s.UpdateTextMetrics(w, r)
 	default:
 		http.Error(w, "Unsupported Content-Type", http.StatusUnsupportedMediaType)
 	}
-
 }
 
 func (s *Server) UpdateJSONMetrics(w http.ResponseWriter, r *http.Request) {
