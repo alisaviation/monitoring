@@ -2,6 +2,8 @@ package config
 
 import (
 	"flag"
+	"os"
+	"strconv"
 	"time"
 )
 
@@ -14,24 +16,38 @@ type Agent struct {
 func SetConfigAgent() Agent {
 	var config Agent
 	config.ServerAddress = "localhost:8080"
-	config.PollInterval = 2
-	config.ReportInterval = 10
+	config.PollInterval = 2 * time.Second
+	config.ReportInterval = 10 * time.Second
 
-	flag.StringVar(&config.ServerAddress, "a", config.ServerAddress, "HTTP server address")
-	p := flag.Int64("p", 2, "Poll interval in seconds")
-	r := flag.Int64("r", 10, "Report interval in seconds")
+	address := flag.String("a", "localhost:8080", "HTTP server address")
+	poll := flag.Int64("p", 2, "Poll interval in seconds")
+	report := flag.Int64("r", 10, "Report interval in seconds")
 
 	flag.Parse()
+	config.ServerAddress = *address
+	config.PollInterval = time.Duration(*poll) * time.Second
+	config.ReportInterval = time.Duration(*report) * time.Second
 
-	config.PollInterval = time.Duration(*p) * time.Second
-	config.ReportInterval = time.Duration(*r) * time.Second
+	if envAddress := os.Getenv("ADDRESS"); envAddress != "" {
+		config.ServerAddress = envAddress
+	}
+	if envReportInterval := os.Getenv("REPORT_INTERVAL"); envReportInterval != "" {
+		if reportInterval, err := strconv.Atoi(envReportInterval); err == nil {
+			config.ReportInterval = time.Duration(reportInterval) * time.Second
+		}
+	}
+	if envPollInterval := os.Getenv("POLL_INTERVAL"); envPollInterval != "" {
+		if pollInterval, err := strconv.Atoi(envPollInterval); err == nil {
+			config.PollInterval = time.Duration(pollInterval) * time.Second
+		}
+	}
 
 	return config
 }
 
 type Server struct {
 	ServerAddress   string
-	StoreInterval   int
+	StoreInterval   time.Duration
 	FileStoragePath string
 	Restore         bool
 }
@@ -39,16 +55,38 @@ type Server struct {
 func SetConfigServer() Server {
 	var config Server
 	config.ServerAddress = "localhost:8080"
-	config.StoreInterval = 300
+	config.StoreInterval = 300 * time.Second
 	config.FileStoragePath = "metrics.json"
-	config.Restore = false
+	config.Restore = true
 
-	flag.StringVar(&config.ServerAddress, "a", config.ServerAddress, "Server address")
-	flag.IntVar(&config.StoreInterval, "i", config.StoreInterval, "Interval in seconds to store metrics")
-	flag.StringVar(&config.FileStoragePath, "f", config.FileStoragePath, "File path")
-	flag.BoolVar(&config.Restore, "r", config.Restore, "Restore metrics from file on start")
+	storeInt := flag.Int("i", 300, "Store interval in seconds")
+	filePath := flag.String("f", "metrics.json", "File storage path")
+	restore := flag.Bool("r", true, "Restore metrics from file")
+	address := flag.String("a", "localhost:8080", "HTTP server address")
 
 	flag.Parse()
+
+	config.ServerAddress = *address
+	config.StoreInterval = time.Duration(*storeInt) * time.Second
+	config.FileStoragePath = *filePath
+	config.Restore = *restore
+
+	if envAddress := os.Getenv("ADDRESS"); envAddress != "" {
+		config.ServerAddress = envAddress
+	}
+	if envStoreInterval := os.Getenv("STORE_INTERVAL"); envStoreInterval != "" {
+		if storeInterval, err := strconv.Atoi(envStoreInterval); err == nil {
+			config.StoreInterval = time.Duration(storeInterval) * time.Second
+		}
+	}
+	if envFilePath := os.Getenv("FILE_STORAGE_PATH"); envFilePath != "" {
+		config.FileStoragePath = envFilePath
+	}
+	if envRestore := os.Getenv("RESTORE"); envRestore != "" {
+		if restoreVal, err := strconv.ParseBool(envRestore); err == nil {
+			config.Restore = restoreVal
+		}
+	}
 
 	return config
 }

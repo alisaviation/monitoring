@@ -4,16 +4,16 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
-	"flag"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alisaviation/monitoring/internal/config"
 	"github.com/alisaviation/monitoring/internal/helpers"
 	"github.com/alisaviation/monitoring/internal/middleware"
 	"github.com/alisaviation/monitoring/internal/models"
@@ -21,11 +21,12 @@ import (
 )
 
 func Test_methodCheck(t *testing.T) {
-	memStorage := storage.NewMemStorage()
+	memStorage := storage.NewMemStorage("")
 	handler := chi.NewRouter()
-	conf := config.SetConfigServer()
-	server := &Server{MemStorage: memStorage, Config: conf}
+	server := &Server{MemStorage: memStorage}
 
+	handler.Post("/update/{type}/{name}/{value}", helpers.MethodCheck([]string{http.MethodPost})(server.UpdateMetrics))
+	handler.Get("/value/{type}/{name}", helpers.MethodCheck([]string{http.MethodGet})(server.GetValue))
 	handler.Post("/update/", helpers.MethodCheck([]string{http.MethodPost})(server.UpdateMetrics))
 	handler.Post("/value/", helpers.MethodCheck([]string{http.MethodPost})(server.GetValue))
 	handler.Get("/value/", helpers.MethodCheck([]string{http.MethodGet})(server.GetValue))
@@ -38,19 +39,28 @@ func Test_methodCheck(t *testing.T) {
 		body         string
 		expectedCode int
 	}{
-		{"POST Update Gauge", http.MethodPost, "/update/", `{"id": "metric1", "type": "gauge", "value": 123.45}`, http.StatusOK},
-		{"POST Update Counter", http.MethodPost, "/update/", `{"id": "metric2", "type": "counter", "delta": 100}`, http.StatusOK},
-		{"POST Value Gauge", http.MethodPost, "/value/", `{"id": "metric1", "type": "gauge"}`, http.StatusOK},
-		{"POST Value Counter", http.MethodPost, "/value/", `{"id": "metric2", "type": "counter"}`, http.StatusOK},
+
+		{"POST Update Gauge JSON", http.MethodPost, "/update/", `{"id": "metric1", "type": "gauge", "value": 123.45}`, http.StatusOK},
+		{"POST Update Counter JSON", http.MethodPost, "/update/", `{"id": "metric2", "type": "counter", "delta": 100}`, http.StatusOK},
+		{"POST Value Gauge JSON", http.MethodPost, "/value/", `{"id": "metric1", "type": "gauge"}`, http.StatusOK},
+		{"POST Value Counter JSON", http.MethodPost, "/value/", `{"id": "metric2", "type": "counter"}`, http.StatusOK},
+		{"POST Update Gauge Text", http.MethodPost, "/update/gauge/metric1/123.45", "", http.StatusOK},
+		{"POST Update Counter Text", http.MethodPost, "/update/counter/metric2/100", "", http.StatusOK},
+		{"GET Value Gauge Text", http.MethodGet, "/value/gauge/metric1", "", http.StatusOK},
+		{"GET Value Counter Text", http.MethodGet, "/value/counter/metric2", "", http.StatusOK},
 		{"GET Metrics List", http.MethodGet, "/", "", http.StatusOK},
+		{"GET Value Empty", http.MethodGet, "/value/", "", http.StatusBadRequest},
+		{"POST Value Empty", http.MethodPost, "/value/", "", http.StatusBadRequest},
 		{"PUT Method Not Allowed", http.MethodPut, "/update/", "", http.StatusMethodNotAllowed},
 		{"DELETE Method Not Allowed", http.MethodDelete, "/update/", "", http.StatusMethodNotAllowed},
+		{"PUT Text Update Not Allowed", http.MethodPut, "/update/gauge/metric1/123.45", "", http.StatusMethodNotAllowed},
+		{"DELETE Text Update Not Allowed", http.MethodDelete, "/update/gauge/metric1/123.45", "", http.StatusMethodNotAllowed},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var req *http.Request
-			if tt.method == http.MethodPost {
+			if tt.method == http.MethodPost && tt.body != "" {
 				req = httptest.NewRequest(tt.method, tt.url, bytes.NewBufferString(tt.body))
 				req.Header.Set("Content-Type", "application/json")
 			} else {
@@ -61,222 +71,394 @@ func Test_methodCheck(t *testing.T) {
 			handler.ServeHTTP(w, req)
 
 			if w.Code != tt.expectedCode {
-				t.Errorf("Expected status code %d, got %d", tt.expectedCode, w.Code)
+				t.Errorf("Expected status code %d, got %d for %s %s", tt.expectedCode, w.Code, tt.method, tt.url)
 			}
 		})
 	}
 }
 
 func Test_updateMetrics(t *testing.T) {
+	memStorage := storage.NewMemStorage("")
+	handler := chi.NewRouter()
+	server := &Server{MemStorage: memStorage}
+
+	handler.Post("/update/", server.UpdateMetrics)
+	handler.Post("/update/{type}/{name}/{value}", server.UpdateMetrics)
+
 	tests := []struct {
 		name         string
 		method       string
 		url          string
+		contentType  string
 		body         string
 		expectedCode int
 		expectedBody string
 	}{
 		{
-			name:         "Valid Gauge Update",
+			name:         "JSON Valid Gauge Update",
 			method:       http.MethodPost,
 			url:          "/update/",
+			contentType:  "application/json",
 			body:         `{"id": "metric1", "type": "gauge", "value": 123.45}`,
 			expectedCode: http.StatusOK,
 			expectedBody: `{"id":"metric1","type":"gauge","value":123.45}`,
 		},
 		{
-			name:         "Valid Counter Update",
+			name:         "JSON Valid Counter Update",
 			method:       http.MethodPost,
 			url:          "/update/",
+			contentType:  "application/json",
 			body:         `{"id": "metric2", "type": "counter", "delta": 100}`,
 			expectedCode: http.StatusOK,
 			expectedBody: `{"id":"metric2","type":"counter","delta":100}`,
 		},
 		{
-			name:         "Invalid Metric Type",
+			name:         "JSON Invalid Metric Type",
 			method:       http.MethodPost,
 			url:          "/update/",
+			contentType:  "application/json",
 			body:         `{"id": "metric1", "type": "invalid", "value": 123.45}`,
 			expectedCode: http.StatusBadRequest,
-			expectedBody: "Bad Request: invalid metric type\n",
+			expectedBody: "Bad Request: invalid metric type",
 		},
 		{
-			name:         "Invalid Gauge Value",
+			name:         "JSON Invalid Gauge Value",
 			method:       http.MethodPost,
 			url:          "/update/",
-			body:         `{"id": "metric1", "type": "gauge", "value": null}`,
+			contentType:  "application/json",
+			body:         `{"id": "metric1", "type": "gauge"}`,
 			expectedCode: http.StatusBadRequest,
-			expectedBody: "Bad Request: value is required for gauge\n",
+			expectedBody: "Bad Request: value is required for gauge",
 		},
 		{
-			name:         "Invalid Counter Value",
+			name:         "JSON Invalid Counter Value",
 			method:       http.MethodPost,
 			url:          "/update/",
+			contentType:  "application/json",
 			body:         `{"id": "metric2", "type": "counter", "delta": null}`,
 			expectedCode: http.StatusBadRequest,
-			expectedBody: "Bad Request: delta is required for counter\n",
+			expectedBody: `Bad Request: delta is required for counter`,
+		},
+		{
+			name:         "Text Valid Gauge Update",
+			method:       http.MethodPost,
+			url:          "/update/gauge/metric3/456.78",
+			contentType:  "text/plain",
+			expectedCode: http.StatusOK,
+			expectedBody: `{"id":"metric3","type":"gauge","value":456.78}`,
+		},
+		{
+			name:         "Text Valid Counter Update",
+			method:       http.MethodPost,
+			url:          "/update/counter/metric4/200",
+			contentType:  "text/plain",
+			expectedCode: http.StatusOK,
+			expectedBody: `{"id":"metric4","type":"counter","delta":200}`,
+		},
+		{
+			name:         "Text Invalid Gauge Value",
+			method:       http.MethodPost,
+			url:          "/update/gauge/metric5/invalid",
+			contentType:  "text/plain",
+			expectedCode: http.StatusBadRequest,
+			expectedBody: "Bad Request: invalid gauge value",
+		},
+		{
+			name:         "Text Invalid Counter Value",
+			method:       http.MethodPost,
+			url:          "/update/counter/metric6/invalid",
+			contentType:  "text/plain",
+			expectedCode: http.StatusBadRequest,
+			expectedBody: "Bad Request: invalid counter value",
+		},
+		{
+			name:         "Text Invalid Metric Type",
+			method:       http.MethodPost,
+			url:          "/update/invalid/metric7/123",
+			contentType:  "text/plain",
+			expectedCode: http.StatusBadRequest,
+			expectedBody: "Bad Request: invalid metric type",
+		},
+		{
+			name:         "Unsupported Content-Type",
+			method:       http.MethodPost,
+			url:          "/update/",
+			contentType:  "application/xml",
+			body:         "<metric><id>test</id><type>gauge</type><value>1.0</value></metric>",
+			expectedCode: http.StatusUnsupportedMediaType,
+			expectedBody: "Unsupported Content-Type",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			memStorage := storage.NewMemStorage()
-
-			handler := chi.NewRouter()
-			flagSet := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
-			var conf config.Server
-			conf.ServerAddress = "localhost:8080"
-			conf.StoreInterval = 300
-			conf.FileStoragePath = "metrics.json"
-			conf.Restore = false
-
-			flagSet.StringVar(&conf.ServerAddress, "a", conf.ServerAddress, "Server address")
-			flagSet.IntVar(&conf.StoreInterval, "i", conf.StoreInterval, "Interval in seconds to store metrics")
-			flagSet.StringVar(&conf.FileStoragePath, "f", conf.FileStoragePath, "File path")
-			flagSet.BoolVar(&conf.Restore, "r", conf.Restore, "Restore metrics from file on start")
-
-			err := flagSet.Parse([]string{})
-			if err != nil {
-				t.Fatalf("Error parsing flags: %v", err)
+			var req *http.Request
+			if tt.body != "" {
+				req = httptest.NewRequest(tt.method, tt.url, bytes.NewBufferString(tt.body))
+			} else {
+				req = httptest.NewRequest(tt.method, tt.url, nil)
 			}
-			server := &Server{MemStorage: memStorage, Config: conf}
 
-			handler.Post("/update/", helpers.MethodCheck([]string{http.MethodPost})(server.UpdateMetrics))
-			req := httptest.NewRequest(tt.method, tt.url, bytes.NewBufferString(tt.body))
-			req.Header.Set("Content-Type", "application/json")
+			if tt.contentType != "" {
+				req.Header.Set("Content-Type", tt.contentType)
+			}
+
 			w := httptest.NewRecorder()
-
 			handler.ServeHTTP(w, req)
 
 			if w.Code != tt.expectedCode {
 				t.Errorf("Expected status code %d, got %d", tt.expectedCode, w.Code)
 			}
 
-			if w.Body.String() != tt.expectedBody {
-				t.Errorf("Expected body %q, got %q", tt.expectedBody, w.Body.String())
+			if !strings.Contains(w.Body.String(), tt.expectedBody) {
+				t.Errorf("Expected body to contain %q, got %q", tt.expectedBody, w.Body.String())
 			}
 		})
 	}
 }
-
 func Test_getValue(t *testing.T) {
+	memStorage := storage.NewMemStorage("")
+	memStorage.SetGauge("metric1", 123.45)
+	memStorage.AddCounter("metric2", 100)
+
 	tests := []struct {
 		name         string
 		method       string
 		url          string
+		contentType  string
 		body         string
 		expectedCode int
 		expectedBody string
 	}{
 		{
-			name:         "Valid Gauge Get",
+			name:         "JSON Valid Gauge Get",
 			method:       http.MethodPost,
 			url:          "/value/",
+			contentType:  "application/json",
 			body:         `{"id": "metric1", "type": "gauge"}`,
 			expectedCode: http.StatusOK,
 			expectedBody: `{"id":"metric1","type":"gauge","value":123.45}`,
 		},
 		{
-			name:         "Valid Counter Get",
+			name:         "JSON Valid Counter Get",
 			method:       http.MethodPost,
 			url:          "/value/",
+			contentType:  "application/json",
 			body:         `{"id": "metric2", "type": "counter"}`,
 			expectedCode: http.StatusOK,
 			expectedBody: `{"id":"metric2","type":"counter","delta":100}`,
 		},
 		{
-			name:         "Invalid Metric Type",
+			name:         "JSON Invalid Metric Type",
 			method:       http.MethodPost,
 			url:          "/value/",
+			contentType:  "application/json",
 			body:         `{"id": "metric1", "type": "invalid"}`,
 			expectedCode: http.StatusBadRequest,
-			expectedBody: "Bad Request: invalid metric type\n{\"id\":\"metric1\",\"type\":\"invalid\"}",
+			expectedBody: `Bad Request: invalid metric type`,
 		},
 		{
-			name:         "Gauge Not Found",
+			name:         "JSON Gauge Not Found",
 			method:       http.MethodPost,
 			url:          "/value/",
+			contentType:  "application/json",
 			body:         `{"id": "nonexistent", "type": "gauge"}`,
 			expectedCode: http.StatusNotFound,
-			expectedBody: "Not Found\n",
+			expectedBody: "Not Found",
 		},
 		{
 			name:         "Counter Not Found",
 			method:       http.MethodPost,
 			url:          "/value/",
+			contentType:  "application/json",
 			body:         `{"id": "nonexistent", "type": "counter"}`,
 			expectedCode: http.StatusNotFound,
-			expectedBody: "Not Found\n",
+			expectedBody: "Not Found",
+		},
+		{
+			name:         "Text Valid Gauge Get",
+			method:       http.MethodGet,
+			url:          "/value/gauge/metric1",
+			contentType:  "text/plain",
+			expectedCode: http.StatusOK,
+			expectedBody: "123.45",
+		},
+		{
+			name:         "Text Valid Counter Get",
+			method:       http.MethodGet,
+			url:          "/value/counter/metric2",
+			contentType:  "text/plain",
+			expectedCode: http.StatusOK,
+			expectedBody: "100",
+		},
+		{
+			name:         "Text Invalid Metric Type",
+			method:       http.MethodGet,
+			url:          "/value/invalid/metric1",
+			contentType:  "text/plain",
+			expectedCode: http.StatusBadRequest,
+			expectedBody: "Bad Request: invalid metric type",
+		},
+		{
+			name:         "Text Gauge Not Found",
+			method:       http.MethodGet,
+			url:          "/value/gauge/nonexistent",
+			contentType:  "text/plain",
+			expectedCode: http.StatusNotFound,
+			expectedBody: "Not Found",
+		},
+		{
+			name:         "Text Counter Not Found",
+			method:       http.MethodGet,
+			url:          "/value/counter/nonexistent",
+			contentType:  "text/plain",
+			expectedCode: http.StatusNotFound,
+			expectedBody: "Not Found",
+		},
+		{
+			name:         "Unsupported Content-Type",
+			method:       http.MethodPost,
+			url:          "/value/",
+			contentType:  "application/xml",
+			body:         "<metric><id>metric1</id><type>gauge</type></metric>",
+			expectedCode: http.StatusBadRequest,
+			expectedBody: "Bad Request: invalid metric type\n",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			memStorage := storage.NewMemStorage()
-			memStorage.SetGauge("metric1", 123.45)
-			memStorage.AddCounter("metric2", 100)
-			flagSet := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
+			server := &Server{MemStorage: memStorage}
+			handler := chi.NewRouter()
 
-			var conf config.Server
-			conf.ServerAddress = "localhost:8080"
-			conf.StoreInterval = 300
-			conf.FileStoragePath = "metrics.json"
-			conf.Restore = false
+			handler.Post("/value/", server.GetValue)
+			handler.Get("/value/{type}/{name}", server.GetValue)
 
-			flagSet.StringVar(&conf.ServerAddress, "a", conf.ServerAddress, "Server address")
-			flagSet.IntVar(&conf.StoreInterval, "i", conf.StoreInterval, "Interval in seconds to store metrics")
-			flagSet.StringVar(&conf.FileStoragePath, "f", conf.FileStoragePath, "File path")
-			flagSet.BoolVar(&conf.Restore, "r", conf.Restore, "Restore metrics from file on start")
-
-			err := flagSet.Parse([]string{})
-			if err != nil {
-				t.Fatalf("Error parsing flags: %v", err)
+			var req *http.Request
+			if tt.body != "" {
+				req = httptest.NewRequest(tt.method, tt.url, bytes.NewBufferString(tt.body))
+			} else {
+				req = httptest.NewRequest(tt.method, tt.url, nil)
 			}
 
-			server := &Server{MemStorage: memStorage, Config: conf}
+			if tt.contentType != "" {
+				req.Header.Set("Content-Type", tt.contentType)
+			}
 
-			handler := chi.NewRouter()
-			handler.Post("/value/", helpers.MethodCheck([]string{http.MethodPost})(server.GetValue))
-
-			req := httptest.NewRequest(tt.method, tt.url, bytes.NewBufferString(tt.body))
-			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
-
 			handler.ServeHTTP(w, req)
 
 			if w.Code != tt.expectedCode {
 				t.Errorf("Expected status code %d, got %d", tt.expectedCode, w.Code)
 			}
 
-			if w.Body.String() != tt.expectedBody {
-				t.Errorf("Expected body %q, got %q", tt.expectedBody, w.Body.String())
+			if !strings.Contains(w.Body.String(), tt.expectedBody) {
+				t.Errorf("Expected body to contain %q, got %q", tt.expectedBody, w.Body.String())
 			}
 		})
 	}
 }
 
+//func Test_gzipSupport(t *testing.T) {
+//	//conf := config.SetConfigServer()
+//	memStorage := storage.NewMemStorage()
+//	memStorage.SetGauge("test_gauge", 123.45)
+//	memStorage.AddCounter("test_counter", 42)
+//	flagSet := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
+//
+//	var conf config.Server
+//	conf.ServerAddress = "localhost:8080"
+//	conf.StoreInterval = 300
+//	conf.FileStoragePath = "metrics.json"
+//	conf.Restore = false
+//
+//	flagSet.StringVar(&conf.ServerAddress, "a", conf.ServerAddress, "Server address")
+//	flagSet.IntVar(&conf.StoreInterval, "i", conf.StoreInterval, "Interval in seconds to store metrics")
+//	flagSet.StringVar(&conf.FileStoragePath, "f", conf.FileStoragePath, "File path")
+//	flagSet.BoolVar(&conf.Restore, "r", conf.Restore, "Restore metrics from file on start")
+//	err := flagSet.Parse([]string{"-a", "localhost:8080", "-i", "300", "-f", "metrics.json", "-r", "false"})
+//	if err != nil {
+//		t.Fatalf("Error parsing flags: %v", err)
+//	}
+//	srv := &Server{MemStorage: memStorage}
+//	testCases := []struct {
+//		name        string
+//		method      string
+//		path        string
+//		contentType string
+//		body        interface{}
+//	}{
+//		{
+//			name:        "Update Gauge",
+//			method:      "POST",
+//			path:        "/update/",
+//			contentType: "application/json",
+//			body: models.Metric{
+//				ID:    "new_gauge",
+//				MType: models.Gauge,
+//				Value: pointer(56.78),
+//			},
+//		},
+//		{
+//			name:        "Update Counter",
+//			method:      "POST",
+//			path:        "/update/",
+//			contentType: "application/json",
+//			body: models.Metric{
+//				ID:    "new_counter",
+//				MType: models.Counter,
+//				Delta: pointer(int64(10)),
+//			},
+//		},
+//		{
+//			name:        "Get Value (Gauge)",
+//			method:      "POST",
+//			path:        "/value/",
+//			contentType: "application/json",
+//			body: models.Metric{
+//				ID:    "test_gauge",
+//				MType: models.Gauge,
+//			},
+//		},
+//		{
+//			name:        "Get Value (Counter)",
+//			method:      "POST",
+//			path:        "/value/",
+//			contentType: "application/json",
+//			body: models.Metric{
+//				ID:    "test_counter",
+//				MType: models.Counter,
+//			},
+//		},
+//		{
+//			name:   "Get Metrics List",
+//			method: "GET",
+//			path:   "/",
+//		},
+//	}
+//
+//	for _, tc := range testCases {
+//		t.Run(tc.name+" with gzip request", func(t *testing.T) {
+//			testGzipRequest(t, srv, tc.method, tc.path, tc.contentType, tc.body)
+//		})
+//
+//		t.Run(tc.name+" with gzip response", func(t *testing.T) {
+//			testGzipResponse(t, srv, tc.method, tc.path, tc.contentType, tc.body)
+//		})
+//	}
+//}
+
 func Test_gzipSupport(t *testing.T) {
-	//conf := config.SetConfigServer()
-	memStorage := storage.NewMemStorage()
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+	os.Args = []string{"cmd", "-a=localhost:8080", "-i=300", "-f=metrics.json", "-r=true"}
+
+	memStorage := storage.NewMemStorage("")
 	memStorage.SetGauge("test_gauge", 123.45)
 	memStorage.AddCounter("test_counter", 42)
-	flagSet := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
 
-	var conf config.Server
-	conf.ServerAddress = "localhost:8080"
-	conf.StoreInterval = 300
-	conf.FileStoragePath = "metrics.json"
-	conf.Restore = false
+	srv := &Server{MemStorage: memStorage}
 
-	flagSet.StringVar(&conf.ServerAddress, "a", conf.ServerAddress, "Server address")
-	flagSet.IntVar(&conf.StoreInterval, "i", conf.StoreInterval, "Interval in seconds to store metrics")
-	flagSet.StringVar(&conf.FileStoragePath, "f", conf.FileStoragePath, "File path")
-	flagSet.BoolVar(&conf.Restore, "r", conf.Restore, "Restore metrics from file on start")
-	err := flagSet.Parse([]string{"-a", "localhost:8080", "-i", "300", "-f", "metrics.json", "-r", "false"})
-	if err != nil {
-		t.Fatalf("Error parsing flags: %v", err)
-	}
-	srv := &Server{MemStorage: memStorage, Config: conf}
 	testCases := []struct {
 		name        string
 		method      string

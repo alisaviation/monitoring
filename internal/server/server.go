@@ -3,44 +3,32 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/alisaviation/monitoring/internal/config"
 	"github.com/alisaviation/monitoring/internal/helpers"
+
 	"github.com/alisaviation/monitoring/internal/models"
 	"github.com/alisaviation/monitoring/internal/storage"
 )
 
 type Server struct {
 	MemStorage *storage.MemStorage
-	Config     config.Server
 }
 
 func (s *Server) UpdateMetrics(w http.ResponseWriter, r *http.Request) {
-	if s.Config.StoreInterval == 0 {
-		defer func() {
-			if err := s.MemStorage.Save(s.Config.FileStoragePath); err != nil {
-				log.Fatalf("Error saving metrics: %v", err)
-			}
-		}()
-	}
 	contentType := r.Header.Get("Content-Type")
 	switch {
 	case strings.Contains(contentType, "application/json"):
 		s.UpdateJSONMetrics(w, r)
-	case strings.Contains(contentType, "text/plain"):
-		s.UpdateTextMetrics(w, r)
-	case contentType == "":
+	case strings.Contains(contentType, "text/plain"), contentType == "":
 		s.UpdateTextMetrics(w, r)
 	default:
 		http.Error(w, "Unsupported Content-Type", http.StatusUnsupportedMediaType)
 	}
-
 }
 
 func (s *Server) UpdateJSONMetrics(w http.ResponseWriter, r *http.Request) {
@@ -78,6 +66,7 @@ func (s *Server) UpdateJSONMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Write(jsonData)
 }
+
 func (s *Server) UpdateTextMetrics(w http.ResponseWriter, r *http.Request) {
 	valueStr := chi.URLParam(r, "value")
 
@@ -116,6 +105,7 @@ func (s *Server) UpdateTextMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Write(jsonData)
 }
+
 func (s *Server) GetValue(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
 	var response interface{}

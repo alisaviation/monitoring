@@ -2,14 +2,13 @@ package helpers
 
 import (
 	"fmt"
-	"log"
 	"net/http"
-	"os"
-	"strconv"
 	"strings"
-	"time"
 
-	"github.com/alisaviation/monitoring/internal/config"
+	"go.uber.org/zap"
+
+	"github.com/alisaviation/monitoring/internal/logger"
+	"github.com/alisaviation/monitoring/internal/storage"
 )
 
 func MethodCheck(methods []string) func(next http.HandlerFunc) http.HandlerFunc {
@@ -31,41 +30,33 @@ func FormatFloat(value float64) string {
 	return strings.TrimRight(strings.TrimRight(formatted, "0"), ".")
 }
 
-func CheckEnvServerVariables(conf *config.Server) {
-	if address := os.Getenv("ADDRESS"); address != "" {
-		conf.ServerAddress = address
-	}
-	if storeInterval := os.Getenv("STORE_INTERVAL"); storeInterval != "" {
-		interval, err := strconv.Atoi(storeInterval)
-		if err != nil {
-			log.Fatalf("Invalid STORE_INTERVAL: %v", err)
-		}
-		conf.StoreInterval = interval
-	}
-	if filePath := os.Getenv("FILE_STORAGE_PATH"); filePath != "" {
-		conf.FileStoragePath = filePath
-	}
-	if restore := os.Getenv("RESTORE"); restore != "" {
-		restoreValue, err := strconv.ParseBool(restore)
-		if err != nil {
-			log.Fatalf("Invalid RESTORE: %v", err)
-		}
-		conf.Restore = restoreValue
+func CheckAndSaveMetrics(storage *storage.MemStorage, prevGauges map[string]float64, prevCounters map[string]int64) {
+	currentGauges := storage.Gauges()
+	currentCounters := storage.Counters()
 
-	}
-}
-func CheckEnvAgentVariables(conf *config.Agent) {
-	if address := os.Getenv("ADDRESS"); address != "" {
-		conf.ServerAddress = address
-	}
-	if reportIntervalStr := os.Getenv("REPORT_INTERVAL"); reportIntervalStr != "" {
-		if reportInterval, err := strconv.Atoi(reportIntervalStr); err == nil {
-			conf.ReportInterval = time.Duration(reportInterval) * time.Second
+	gaugeChanged := len(prevGauges) != len(currentGauges)
+	if !gaugeChanged {
+		for k, v := range currentGauges {
+			if prevGauges[k] != v {
+				gaugeChanged = true
+				break
+			}
 		}
 	}
-	if pollIntervalStr := os.Getenv("POLL_INTERVAL"); pollIntervalStr != "" {
-		if pollInterval, err := strconv.Atoi(pollIntervalStr); err == nil {
-			conf.PollInterval = time.Duration(pollInterval) * time.Second
+
+	counterChanged := len(prevCounters) != len(currentCounters)
+	if !counterChanged {
+		for k, v := range currentCounters {
+			if prevCounters[k] != v {
+				counterChanged = true
+				break
+			}
+		}
+	}
+
+	if gaugeChanged || counterChanged {
+		if err := storage.Save(); err != nil {
+			logger.Log.Error("Error saving metrics", zap.Error(err))
 		}
 	}
 }

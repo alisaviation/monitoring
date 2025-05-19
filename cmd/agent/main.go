@@ -8,14 +8,12 @@ import (
 	"github.com/alisaviation/monitoring/internal/agent/collector"
 	"github.com/alisaviation/monitoring/internal/agent/sender"
 	"github.com/alisaviation/monitoring/internal/config"
-	"github.com/alisaviation/monitoring/internal/helpers"
 	"github.com/alisaviation/monitoring/internal/logger"
 	"github.com/alisaviation/monitoring/internal/models"
 )
 
 func main() {
 	conf := config.SetConfigAgent()
-	helpers.CheckEnvAgentVariables(&conf)
 
 	collectorInstance := collector.NewCollector()
 	senderInstance := sender.NewSender(conf.ServerAddress)

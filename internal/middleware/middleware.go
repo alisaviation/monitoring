@@ -5,6 +5,11 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
+
+	"github.com/alisaviation/monitoring/internal/helpers"
+	"github.com/alisaviation/monitoring/internal/storage"
 )
 
 func GzipMiddleware(next http.Handler) http.Handler {
@@ -37,4 +42,68 @@ type gzipWriter struct {
 
 func (g gzipWriter) Write(b []byte) (int, error) {
 	return g.Writer.Write(b)
+}
+
+func SyncSaveMiddleware(storeInterval time.Duration, storage *storage.MemStorage) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost {
+				var prevGauges map[string]float64
+				var prevCounters map[string]int64
+
+				if storeInterval == 0 {
+					prevGauges = make(map[string]float64)
+					prevCounters = make(map[string]int64)
+					for k, v := range storage.Gauges() {
+						prevGauges[k] = v
+					}
+					for k, v := range storage.Counters() {
+						prevCounters[k] = v
+					}
+				}
+				ww := &responseWriterWrapper{
+					ResponseWriter: w,
+					onWriteHeader: func() {
+						if storeInterval == 0 {
+							helpers.CheckAndSaveMetrics(storage, prevGauges, prevCounters)
+						}
+					},
+				}
+				next.ServeHTTP(ww, r)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+type responseWriterWrapper struct {
+	http.ResponseWriter
+	onWriteHeader func()
+	headerWritten bool
+	mu            sync.Mutex
+}
+
+func (w *responseWriterWrapper) WriteHeader(code int) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if !w.headerWritten {
+		w.headerWritten = true
+		if w.onWriteHeader != nil {
+			w.onWriteHeader()
+		}
+	}
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *responseWriterWrapper) Write(b []byte) (int, error) {
+	w.mu.Lock()
+	if !w.headerWritten {
+		w.headerWritten = true
+		if w.onWriteHeader != nil {
+			w.onWriteHeader()
+		}
+	}
+	w.mu.Unlock()
+	return w.ResponseWriter.Write(b)
 }
