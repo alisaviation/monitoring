@@ -5,12 +5,22 @@ meta {
 }
 
 post {
-  url: http://localhost:8080/update/gauge/temperature/9
-  body: none
+  url: http://localhost:8080/update/
+  body: json
   auth: none
 }
 
 headers {
   Content-Length: 0
-  Content-Type: text/plain
+  Content-Type: application/json
+  Content-Encoding: gzip
+  ~Accept-Encoding: gzip
+}
+
+body:json {
+  {
+    "id": "PollCount",
+    "type": "counter",
+    "value": 12
+  }
 }

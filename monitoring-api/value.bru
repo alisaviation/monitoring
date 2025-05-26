@@ -1,0 +1,28 @@
+meta {
+  name: value
+  type: http
+  seq: 4
+}
+
+get {
+  url: http://localhost:8080/value/
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept-Encoding: gzip
+  ~Content-Encoding: gzip
+}
+
+body:json {
+  // {
+    // "id": "Mallocs",
+    // "type": "gauge"
+  // }
+  {
+    "id": "PollCount",
+    "type": "counter"
+  }
+}
