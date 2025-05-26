@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"flag"
 	"log"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	_ "github.com/lib/pq"
 	"go.uber.org/zap"
 
 	"github.com/alisaviation/monitoring/internal/config"
@@ -22,7 +24,7 @@ import (
 )
 
 func main() {
-	var saveTicker *time.Ticker
+
 	conf := config.SetConfigServer()
 	if len(flag.Args()) > 0 {
 		log.Fatalf("Unknown flags: %v", flag.Args())
@@ -42,6 +44,26 @@ func main() {
 		}
 	}
 
+	var db *sql.DB
+	if conf.DatabaseDSN != "" {
+		logger.Log.Info("Connecting to DB", zap.String("dsn", conf.DatabaseDSN))
+		var err error
+		db, err = sql.Open("postgres", conf.DatabaseDSN)
+		if err != nil {
+			logger.Log.Fatal("Failed to connect to database", zap.Error(err))
+		}
+		defer db.Close()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err = db.PingContext(ctx); err != nil {
+			logger.Log.Fatal("Failed to ping database", zap.Error(err))
+		}
+		logger.Log.Info("Successfully connected to database")
+	}
+
+	var saveTicker *time.Ticker
 	if conf.StoreInterval > 0 {
 		saveTicker = time.NewTicker(conf.StoreInterval)
 		go func() {
@@ -62,7 +84,7 @@ func main() {
 
 	srv := &http.Server{Addr: conf.ServerAddress}
 	go func() {
-		if err := run(memStorage, srv, conf.StoreInterval); err != nil && err != http.ErrServerClosed {
+		if err := run(memStorage, srv, conf.StoreInterval, db); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Error running server: %v", err)
 		}
 	}()
@@ -87,8 +109,9 @@ func main() {
 	logger.Log.Info("Server stopped")
 }
 
-func run(memStorage *storage.MemStorage, srv *http.Server, storeInterval time.Duration) error {
-	srvr := &server.Server{MemStorage: memStorage}
+func run(memStorage *storage.MemStorage, srv *http.Server, storeInterval time.Duration, db *sql.DB) error {
+	srvr := server.NewServer(memStorage, db)
+
 	r := chi.NewRouter()
 	r.Use(logger.RequestResponseLogger)
 	r.Use(middleware.GzipMiddleware)
@@ -100,6 +123,7 @@ func run(memStorage *storage.MemStorage, srv *http.Server, storeInterval time.Du
 	r.Get("/value/", helpers.MethodCheck([]string{http.MethodGet})(srvr.GetValue))
 	r.Post("/value/", helpers.MethodCheck([]string{http.MethodPost})(srvr.GetValue))
 	r.Get("/", helpers.MethodCheck([]string{http.MethodGet})(srvr.GetMetricsList))
+	r.Get("/ping", helpers.MethodCheck([]string{http.MethodGet})(srvr.PingHandler))
 
 	srv.Handler = r
 	return srv.ListenAndServe()

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -17,6 +18,28 @@ import (
 
 type Server struct {
 	MemStorage *storage.MemStorage
+	DB         *sql.DB
+}
+
+func NewServer(memStorage *storage.MemStorage, db *sql.DB) *Server {
+	return &Server{
+		MemStorage: memStorage,
+		DB:         db,
+	}
+}
+
+func (s *Server) PingHandler(w http.ResponseWriter, r *http.Request) {
+	if s.DB == nil {
+		http.Error(w, "Database connection not initialized", http.StatusInternalServerError)
+		return
+	}
+
+	if err := s.DB.Ping(); err != nil {
+		http.Error(w, "Database connection failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) UpdateMetrics(w http.ResponseWriter, r *http.Request) {

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
 
@@ -23,7 +24,11 @@ import (
 func Test_methodCheck(t *testing.T) {
 	memStorage := storage.NewMemStorage("")
 	handler := chi.NewRouter()
-	server := &Server{MemStorage: memStorage}
+
+	db, mock, _ := sqlmock.New()
+	defer db.Close()
+
+	server := &Server{MemStorage: memStorage, DB: db}
 
 	handler.Post("/update/{type}/{name}/{value}", helpers.MethodCheck([]string{http.MethodPost})(server.UpdateMetrics))
 	handler.Get("/value/{type}/{name}", helpers.MethodCheck([]string{http.MethodGet})(server.GetValue))
@@ -31,30 +36,38 @@ func Test_methodCheck(t *testing.T) {
 	handler.Post("/value/", helpers.MethodCheck([]string{http.MethodPost})(server.GetValue))
 	handler.Get("/value/", helpers.MethodCheck([]string{http.MethodGet})(server.GetValue))
 	handler.Get("/", helpers.MethodCheck([]string{http.MethodGet})(server.GetMetricsList))
-
+	handler.Get("/ping", helpers.MethodCheck([]string{http.MethodGet})(server.PingHandler))
 	tests := []struct {
 		name         string
 		method       string
 		url          string
 		body         string
 		expectedCode int
+		setupMock    func()
 	}{
 
-		{"POST Update Gauge JSON", http.MethodPost, "/update/", `{"id": "metric1", "type": "gauge", "value": 123.45}`, http.StatusOK},
-		{"POST Update Counter JSON", http.MethodPost, "/update/", `{"id": "metric2", "type": "counter", "delta": 100}`, http.StatusOK},
-		{"POST Value Gauge JSON", http.MethodPost, "/value/", `{"id": "metric1", "type": "gauge"}`, http.StatusOK},
-		{"POST Value Counter JSON", http.MethodPost, "/value/", `{"id": "metric2", "type": "counter"}`, http.StatusOK},
-		{"POST Update Gauge Text", http.MethodPost, "/update/gauge/metric1/123.45", "", http.StatusOK},
-		{"POST Update Counter Text", http.MethodPost, "/update/counter/metric2/100", "", http.StatusOK},
-		{"GET Value Gauge Text", http.MethodGet, "/value/gauge/metric1", "", http.StatusOK},
-		{"GET Value Counter Text", http.MethodGet, "/value/counter/metric2", "", http.StatusOK},
-		{"GET Metrics List", http.MethodGet, "/", "", http.StatusOK},
-		{"GET Value Empty", http.MethodGet, "/value/", "", http.StatusBadRequest},
-		{"POST Value Empty", http.MethodPost, "/value/", "", http.StatusBadRequest},
-		{"PUT Method Not Allowed", http.MethodPut, "/update/", "", http.StatusMethodNotAllowed},
-		{"DELETE Method Not Allowed", http.MethodDelete, "/update/", "", http.StatusMethodNotAllowed},
-		{"PUT Text Update Not Allowed", http.MethodPut, "/update/gauge/metric1/123.45", "", http.StatusMethodNotAllowed},
-		{"DELETE Text Update Not Allowed", http.MethodDelete, "/update/gauge/metric1/123.45", "", http.StatusMethodNotAllowed},
+		{"POST Update Gauge JSON", http.MethodPost, "/update/", `{"id": "metric1", "type": "gauge", "value": 123.45}`, http.StatusOK, nil},
+		{"POST Update Counter JSON", http.MethodPost, "/update/", `{"id": "metric2", "type": "counter", "delta": 100}`, http.StatusOK, nil},
+		{"POST Value Gauge JSON", http.MethodPost, "/value/", `{"id": "metric1", "type": "gauge"}`, http.StatusOK, nil},
+		{"POST Value Counter JSON", http.MethodPost, "/value/", `{"id": "metric2", "type": "counter"}`, http.StatusOK, nil},
+		{"POST Update Gauge Text", http.MethodPost, "/update/gauge/metric1/123.45", "", http.StatusOK, nil},
+		{"POST Update Counter Text", http.MethodPost, "/update/counter/metric2/100", "", http.StatusOK, nil},
+		{"GET Value Gauge Text", http.MethodGet, "/value/gauge/metric1", "", http.StatusOK, nil},
+		{"GET Value Counter Text", http.MethodGet, "/value/counter/metric2", "", http.StatusOK, nil},
+		{"GET Metrics List", http.MethodGet, "/", "", http.StatusOK, nil},
+		{"GET Value Empty", http.MethodGet, "/value/", "", http.StatusBadRequest, nil},
+		{"POST Value Empty", http.MethodPost, "/value/", "", http.StatusBadRequest, nil},
+		{"PUT Method Not Allowed", http.MethodPut, "/update/", "", http.StatusMethodNotAllowed, nil},
+		{"DELETE Method Not Allowed", http.MethodDelete, "/update/", "", http.StatusMethodNotAllowed, nil},
+		{"PUT Text Update Not Allowed", http.MethodPut, "/update/gauge/metric1/123.45", "", http.StatusMethodNotAllowed, nil},
+		{"DELETE Text Update Not Allowed", http.MethodDelete, "/update/gauge/metric1/123.45", "", http.StatusMethodNotAllowed, nil},
+		{
+			name:         "GET Ping Success",
+			method:       http.MethodGet,
+			url:          "/ping",
+			expectedCode: http.StatusOK,
+			setupMock:    func() { mock.ExpectPing() },
+		},
 	}
 
 	for _, tt := range tests {

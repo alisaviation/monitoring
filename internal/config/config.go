@@ -50,6 +50,7 @@ type Server struct {
 	StoreInterval   time.Duration
 	FileStoragePath string
 	Restore         bool
+	DatabaseDSN     string
 }
 
 func SetConfigServer() Server {
@@ -58,11 +59,13 @@ func SetConfigServer() Server {
 	config.StoreInterval = 300 * time.Second
 	config.FileStoragePath = "metrics.json"
 	config.Restore = true
+	config.DatabaseDSN = ""
 
 	storeInt := flag.Int("i", 300, "Store interval in seconds")
 	filePath := flag.String("f", "metrics.json", "File storage path")
 	restore := flag.Bool("r", true, "Restore metrics from file")
 	address := flag.String("a", "localhost:8080", "HTTP server address")
+	databaseDSN := flag.String("d", "", "Database connection string (DSN)")
 
 	flag.Parse()
 
@@ -70,6 +73,7 @@ func SetConfigServer() Server {
 	config.StoreInterval = time.Duration(*storeInt) * time.Second
 	config.FileStoragePath = *filePath
 	config.Restore = *restore
+	config.DatabaseDSN = *databaseDSN
 
 	if envAddress := os.Getenv("ADDRESS"); envAddress != "" {
 		config.ServerAddress = envAddress
@@ -86,6 +90,9 @@ func SetConfigServer() Server {
 		if restoreVal, err := strconv.ParseBool(envRestore); err == nil {
 			config.Restore = restoreVal
 		}
+	}
+	if envDatabaseDSN := os.Getenv("DATABASE_DSN"); envDatabaseDSN != "" {
+		config.DatabaseDSN = envDatabaseDSN
 	}
 
 	return config
