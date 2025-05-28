@@ -31,8 +31,8 @@ func FormatFloat(value float64) string {
 }
 
 func CheckAndSaveMetrics(storage *storage.MemStorage, prevGauges map[string]float64, prevCounters map[string]int64) {
-	currentGauges := storage.Gauges()
-	currentCounters := storage.Counters()
+	currentGauges, _ := storage.Gauges()
+	currentCounters, _ := storage.Counters()
 
 	gaugeChanged := len(prevGauges) != len(currentGauges)
 	if !gaugeChanged {

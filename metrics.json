@@ -1,0 +1,18 @@
+{
+    "gauges": {
+        "GCCPUFraction": 0,
+        "HeapAlloc": 251608,
+        "HeapInuse": 892928,
+        "LastGC": 0,
+        "Mallocs": 780,
+        "NumForcedGC": 0,
+        "OtherSys": 935975,
+        "RandomValue": 0.9591006078895784,
+        "StackSys": 262144,
+        "testSetGet38": 357884.384
+    },
+    "counters": {
+        "PollCount": 4,
+        "testSetGet173": 1838
+    }
+}

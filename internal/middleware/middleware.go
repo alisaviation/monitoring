@@ -54,12 +54,35 @@ func SyncSaveMiddleware(storeInterval time.Duration, storage *storage.MemStorage
 				if storeInterval == 0 {
 					prevGauges = make(map[string]float64)
 					prevCounters = make(map[string]int64)
-					for k, v := range storage.Gauges() {
-						prevGauges[k] = v
+
+					// Обработка значений и ошибок
+					gauges, err := storage.Gauges()
+					if err != nil {
+						// Обработка ошибки, если это необходимо
+						// Например, можно записать ошибку в лог
+						// log.Println("Error getting gauges:", err)
+					} else {
+						for k, v := range gauges {
+							prevGauges[k] = v
+						}
 					}
-					for k, v := range storage.Counters() {
-						prevCounters[k] = v
+
+					// Аналогично для счетчиков
+					counters, err := storage.Counters()
+					if err != nil {
+						// Обработка ошибки, если это необходимо
+						// log.Println("Error getting counters:", err)
+					} else {
+						for k, v := range counters {
+							prevCounters[k] = v
+						}
 					}
+					//for k, v := range storage.Gauges() {
+					//	prevGauges[k] = v
+					//}
+					//for k, v := range storage.Counters() {
+					//	prevCounters[k] = v
+					//}
 				}
 				ww := &responseWriterWrapper{
 					ResponseWriter: w,
