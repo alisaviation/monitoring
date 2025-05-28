@@ -34,17 +34,9 @@ func main() {
 		log.Fatalf("Error initializing logger: %v", err)
 	}
 
-	memStorage := storage.NewMemStorage(conf.FileStoragePath)
-
-	if conf.Restore {
-		if err := memStorage.Load(); err != nil {
-			logger.Log.Info("Could not load metrics from file", zap.Error(err))
-		} else {
-			logger.Log.Info("Metrics loaded from file", zap.String("path", conf.FileStoragePath))
-		}
-	}
-
+	var storageInstance storage.Storage
 	var db *sql.DB
+
 	if conf.DatabaseDSN != "" {
 		logger.Log.Info("Connecting to DB", zap.String("dsn", conf.DatabaseDSN))
 		var err error
@@ -61,22 +53,37 @@ func main() {
 			logger.Log.Fatal("Failed to ping database", zap.Error(err))
 		}
 		logger.Log.Info("Successfully connected to database")
-	}
-
-	var saveTicker *time.Ticker
-	if conf.StoreInterval > 0 {
-		saveTicker = time.NewTicker(conf.StoreInterval)
-		go func() {
-			for range saveTicker.C {
-				if err := memStorage.Save(); err != nil {
-					logger.Log.Error("Error saving metrics", zap.Error(err))
-				} else {
-					logger.Log.Debug("Metrics saved to file", zap.String("path", conf.FileStoragePath))
-				}
-			}
-		}()
+		storageInstance, err = storage.NewPostgresStorageFromDB(db)
+		if err != nil {
+			logger.Log.Fatal("Failed to create Postgres storage", zap.Error(err))
+		}
 	} else {
-		logger.Log.Info("Synchronous save mode enabled")
+		memStorage := storage.NewMemStorage(conf.FileStoragePath)
+
+		if conf.Restore {
+			if err := memStorage.Load(); err != nil {
+				logger.Log.Info("Could not load metrics from file", zap.Error(err))
+			} else {
+				logger.Log.Info("Metrics loaded from file", zap.String("path", conf.FileStoragePath))
+			}
+		}
+
+		storageInstance = memStorage
+
+		if conf.StoreInterval > 0 {
+			saveTicker := time.NewTicker(conf.StoreInterval)
+			go func() {
+				for range saveTicker.C {
+					if err := memStorage.Save(); err != nil {
+						logger.Log.Error("Error saving metrics", zap.Error(err))
+					} else {
+						logger.Log.Debug("Metrics saved to file", zap.String("path", conf.FileStoragePath))
+					}
+				}
+			}()
+		} else {
+			logger.Log.Info("Synchronous save mode enabled")
+		}
 	}
 
 	done := make(chan os.Signal, 1)
@@ -84,7 +91,7 @@ func main() {
 
 	srv := &http.Server{Addr: conf.ServerAddress}
 	go func() {
-		if err := run(memStorage, srv, conf.StoreInterval, db); err != nil && err != http.ErrServerClosed {
+		if err := run(storageInstance, srv, conf.StoreInterval, db); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Error running server: %v", err)
 		}
 	}()
@@ -92,14 +99,21 @@ func main() {
 
 	<-done
 	logger.Log.Info("Server is shutting down...")
-	if saveTicker != nil {
-		saveTicker.Stop()
+	if db != nil {
+		if err := db.Close(); err != nil {
+			logger.Log.Error("Failed to close database connection", zap.Error(err))
+		}
 	}
-	if err := memStorage.Save(); err != nil {
-		logger.Log.Error("Error saving metrics on shutdown", zap.Error(err))
-	} else {
-		logger.Log.Info("Metrics saved on shutdown")
+	if storageInstance != nil {
+		if memStorage, ok := storageInstance.(*storage.MemStorage); ok {
+			if err := memStorage.Save(); err != nil {
+				logger.Log.Error("Error saving metrics on shutdown", zap.Error(err))
+			} else {
+				logger.Log.Info("Metrics saved on shutdown")
+			}
+		}
 	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -109,13 +123,13 @@ func main() {
 	logger.Log.Info("Server stopped")
 }
 
-func run(memStorage *storage.MemStorage, srv *http.Server, storeInterval time.Duration, db *sql.DB) error {
-	srvr := server.NewServer(memStorage, db)
+func run(storageInstance storage.Storage, srv *http.Server, storeInterval time.Duration, db *sql.DB) error {
+	srvr := server.NewServer(storageInstance, db)
 
 	r := chi.NewRouter()
 	r.Use(logger.RequestResponseLogger)
 	r.Use(middleware.GzipMiddleware)
-	r.Use(middleware.SyncSaveMiddleware(storeInterval, memStorage))
+	r.Use(middleware.SyncSaveMiddleware(storeInterval, storageInstance))
 
 	r.Post("/update/{type}/{name}/{value}", helpers.MethodCheck([]string{http.MethodPost})(srvr.UpdateMetrics))
 	r.Get("/value/{type}/{name}", helpers.MethodCheck([]string{http.MethodGet})(srvr.GetValue))

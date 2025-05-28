@@ -152,7 +152,9 @@ func (p *PostgresStorage) Counters() (map[string]int64, error) {
 	}
 	return counters, nil
 }
-
+func (p *PostgresStorage) Save() error {
+	return nil
+}
 func (p *PostgresStorage) Close() error {
 	return p.Db.Close()
 }

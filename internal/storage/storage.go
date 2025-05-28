@@ -7,4 +7,5 @@ type Storage interface {
 	GetCounter(name string) (*int64, bool)
 	Gauges() (map[string]float64, error)
 	Counters() (map[string]int64, error)
+	Save() error
 }

@@ -17,25 +17,14 @@ import (
 )
 
 type Server struct {
-	psqlStorage storage.Storage
-	DB          *sql.DB
-	MemStorage  *storage.MemStorage
+	Storage storage.Storage
+	DB      *sql.DB
 }
 
-func NewServer(memStorage *storage.MemStorage, db *sql.DB) *Server {
-	var s storage.Storage = memStorage
-
-	if db != nil {
-		pgStorage, err := storage.NewPostgresStorageFromDB(db)
-		if err == nil {
-			s = pgStorage
-		}
-	}
-
+func NewServer(storage storage.Storage, db *sql.DB) *Server {
 	return &Server{
-		psqlStorage: s,
-		DB:          db,
-		MemStorage:  memStorage,
+		Storage: storage,
+		DB:      db,
 	}
 }
 
@@ -78,22 +67,22 @@ func (s *Server) UpdateJSONMetrics(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Bad Request: value is required for gauge", http.StatusBadRequest)
 			return
 		}
-		if err := s.psqlStorage.SetGauge(metrics.ID, *metrics.Value); err != nil {
+		if err := s.Storage.SetGauge(metrics.ID, *metrics.Value); err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-		metrics.Value, _ = s.psqlStorage.GetGauge(metrics.ID)
+		metrics.Value, _ = s.Storage.GetGauge(metrics.ID)
 
 	case models.Counter:
 		if metrics.Delta == nil {
 			http.Error(w, "Bad Request: delta is required for counter", http.StatusBadRequest)
 			return
 		}
-		if err := s.psqlStorage.AddCounter(metrics.ID, *metrics.Delta); err != nil {
+		if err := s.Storage.AddCounter(metrics.ID, *metrics.Delta); err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-		metrics.Delta, _ = s.psqlStorage.GetCounter(metrics.ID)
+		metrics.Delta, _ = s.Storage.GetCounter(metrics.ID)
 
 	default:
 		http.Error(w, "Bad Request: invalid metric type", http.StatusBadRequest)
@@ -108,9 +97,9 @@ func (s *Server) UpdateJSONMetrics(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) UpdateTextMetrics(w http.ResponseWriter, r *http.Request) {
-	valueStr := chi.URLParam(r, "value")
 
 	var metrics models.Metric
+	valueStr := chi.URLParam(r, "value")
 	metrics.ID = chi.URLParam(r, "name")
 	metrics.MType = chi.URLParam(r, "type")
 
@@ -121,13 +110,11 @@ func (s *Server) UpdateTextMetrics(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Bad Request: invalid gauge value", http.StatusBadRequest)
 			return
 		}
-		if err := s.psqlStorage.SetGauge(metrics.ID, value); err != nil {
+		if err := s.Storage.SetGauge(metrics.ID, value); err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-		metrics.Value, _ = s.psqlStorage.GetGauge(metrics.ID)
-		//metrics.Value = &value
-		//s.MemStorage.SetGauge(metrics.ID, value)
+		metrics.Value, _ = s.Storage.GetGauge(metrics.ID)
 
 	case models.Counter:
 		delta, err := strconv.ParseInt(valueStr, 10, 64)
@@ -135,13 +122,11 @@ func (s *Server) UpdateTextMetrics(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Bad Request: invalid counter value", http.StatusBadRequest)
 			return
 		}
-		if err := s.psqlStorage.AddCounter(metrics.ID, delta); err != nil {
+		if err := s.Storage.AddCounter(metrics.ID, delta); err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-		metrics.Delta, _ = s.psqlStorage.GetCounter(metrics.ID)
-		//metrics.Delta = &delta
-		//s.MemStorage.AddCounter(metrics.ID, delta)
+		metrics.Delta, _ = s.Storage.GetCounter(metrics.ID)
 
 	default:
 		http.Error(w, "Bad Request: invalid metric type", http.StatusBadRequest)
@@ -209,14 +194,14 @@ func (s *Server) GetJSONValue(w http.ResponseWriter, r *http.Request) models.Met
 
 	switch metrics.MType {
 	case models.Gauge:
-		value, exists := s.psqlStorage.GetGauge(metrics.ID)
+		value, exists := s.Storage.GetGauge(metrics.ID)
 		if !exists {
 			http.Error(w, "Not Found", http.StatusNotFound)
 			return models.Metric{}
 		}
 		metrics.Value = value
 	case models.Counter:
-		delta, exists := s.psqlStorage.GetCounter(metrics.ID)
+		delta, exists := s.Storage.GetCounter(metrics.ID)
 		if !exists {
 			http.Error(w, "Not Found", http.StatusNotFound)
 			return models.Metric{}
@@ -236,14 +221,14 @@ func (s *Server) GetTextValue(w http.ResponseWriter, r *http.Request) models.Met
 
 	switch metrics.MType {
 	case models.Gauge:
-		value, exists := s.psqlStorage.GetGauge(metrics.ID)
+		value, exists := s.Storage.GetGauge(metrics.ID)
 		if !exists {
 			http.Error(w, "Not Found", http.StatusNotFound)
 			return models.Metric{}
 		}
 		metrics.Value = value
 	case models.Counter:
-		delta, exists := s.psqlStorage.GetCounter(metrics.ID)
+		delta, exists := s.Storage.GetCounter(metrics.ID)
 		if !exists {
 			http.Error(w, "Not Found", http.StatusNotFound)
 			return models.Metric{}
@@ -261,25 +246,19 @@ func (s *Server) GetMetricsList(w http.ResponseWriter, r *http.Request) {
 
 	response.WriteString("<html><body><h1>Metrics</h1><ul>")
 
-	gauges, err := s.psqlStorage.Gauges()
+	gauges, err := s.Storage.Gauges()
 	if err == nil {
 		for name, value := range gauges {
 			response.WriteString(fmt.Sprintf("<li>%s: %s</li>", name, helpers.FormatFloat(value)))
 		}
 	}
-	//for name, value := range s.MemStorage.Gauges() {
-	//	response.WriteString(fmt.Sprintf("<li>%s: %s</li>", name, helpers.FormatFloat(value)))
-	//}
-	counters, err := s.psqlStorage.Counters()
+
+	counters, err := s.Storage.Counters()
 	if err == nil {
 		for name, value := range counters {
 			response.WriteString(fmt.Sprintf("<li>%s: %d</li>", name, value))
 		}
 	}
-
-	//for name, value := range s.MemStorage.Counters() {
-	//	response.WriteString(fmt.Sprintf("<li>%s: %d</li>", name, value))
-	//}
 
 	response.WriteString("</ul></body></html>")
 

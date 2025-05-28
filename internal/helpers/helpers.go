@@ -30,7 +30,7 @@ func FormatFloat(value float64) string {
 	return strings.TrimRight(strings.TrimRight(formatted, "0"), ".")
 }
 
-func CheckAndSaveMetrics(storage *storage.MemStorage, prevGauges map[string]float64, prevCounters map[string]int64) {
+func CheckAndSaveMetrics(storage storage.Storage, prevGauges map[string]float64, prevCounters map[string]int64) {
 	currentGauges, _ := storage.Gauges()
 	currentCounters, _ := storage.Counters()
 

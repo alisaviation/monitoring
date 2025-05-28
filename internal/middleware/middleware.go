@@ -3,6 +3,7 @@ package middleware
 import (
 	"compress/gzip"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -44,7 +45,7 @@ func (g gzipWriter) Write(b []byte) (int, error) {
 	return g.Writer.Write(b)
 }
 
-func SyncSaveMiddleware(storeInterval time.Duration, storage *storage.MemStorage) func(next http.Handler) http.Handler {
+func SyncSaveMiddleware(storeInterval time.Duration, storage storage.Storage) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPost {
@@ -55,34 +56,24 @@ func SyncSaveMiddleware(storeInterval time.Duration, storage *storage.MemStorage
 					prevGauges = make(map[string]float64)
 					prevCounters = make(map[string]int64)
 
-					// Обработка значений и ошибок
 					gauges, err := storage.Gauges()
 					if err != nil {
-						// Обработка ошибки, если это необходимо
-						// Например, можно записать ошибку в лог
-						// log.Println("Error getting gauges:", err)
+						log.Println("Error getting gauges:", err)
 					} else {
 						for k, v := range gauges {
 							prevGauges[k] = v
 						}
 					}
 
-					// Аналогично для счетчиков
 					counters, err := storage.Counters()
 					if err != nil {
-						// Обработка ошибки, если это необходимо
-						// log.Println("Error getting counters:", err)
+						log.Println("Error getting counters:", err)
 					} else {
 						for k, v := range counters {
 							prevCounters[k] = v
 						}
 					}
-					//for k, v := range storage.Gauges() {
-					//	prevGauges[k] = v
-					//}
-					//for k, v := range storage.Counters() {
-					//	prevCounters[k] = v
-					//}
+
 				}
 				ww := &responseWriterWrapper{
 					ResponseWriter: w,
