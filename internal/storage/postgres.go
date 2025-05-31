@@ -10,7 +10,7 @@ import (
 )
 
 type PostgresStorage struct {
-	Db *sql.DB
+	DB *sql.DB
 }
 
 func NewPostgresStorageFromDB(db *sql.DB) (*PostgresStorage, error) {
@@ -27,7 +27,7 @@ func NewPostgresStorageFromDB(db *sql.DB) (*PostgresStorage, error) {
 		return nil, fmt.Errorf("failed to create tables: %w", err)
 	}
 
-	return &PostgresStorage{Db: db}, nil
+	return &PostgresStorage{DB: db}, nil
 }
 
 func createTables(db *sql.DB) error {
@@ -63,7 +63,7 @@ func createTables(db *sql.DB) error {
 
 func (p *PostgresStorage) SetGauge(name string, value float64) error {
 	ctx := context.Background()
-	_, err := p.Db.ExecContext(ctx, `
+	_, err := p.DB.ExecContext(ctx, `
 		INSERT INTO gauges (name, value)
 		VALUES ($1, $2)
 		ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value
@@ -73,7 +73,7 @@ func (p *PostgresStorage) SetGauge(name string, value float64) error {
 
 func (p *PostgresStorage) AddCounter(name string, value int64) error {
 	ctx := context.Background()
-	_, err := p.Db.ExecContext(ctx, `
+	_, err := p.DB.ExecContext(ctx, `
 		INSERT INTO counters (name, value)
 		VALUES ($1, $2)
 		ON CONFLICT (name) DO UPDATE SET value = counters.value + EXCLUDED.value
@@ -84,7 +84,7 @@ func (p *PostgresStorage) AddCounter(name string, value int64) error {
 func (p *PostgresStorage) GetGauge(name string) (*float64, bool) {
 	ctx := context.Background()
 	var value float64
-	err := p.Db.QueryRowContext(ctx, `
+	err := p.DB.QueryRowContext(ctx, `
 		SELECT value FROM gauges WHERE name = $1
 	`, name).Scan(&value)
 
@@ -100,7 +100,7 @@ func (p *PostgresStorage) GetGauge(name string) (*float64, bool) {
 func (p *PostgresStorage) GetCounter(name string) (*int64, bool) {
 	ctx := context.Background()
 	var value int64
-	err := p.Db.QueryRowContext(ctx, `
+	err := p.DB.QueryRowContext(ctx, `
 		SELECT value FROM counters WHERE name = $1
 	`, name).Scan(&value)
 
@@ -115,7 +115,7 @@ func (p *PostgresStorage) GetCounter(name string) (*int64, bool) {
 
 func (p *PostgresStorage) Gauges() (map[string]float64, error) {
 	ctx := context.Background()
-	rows, err := p.Db.QueryContext(ctx, "SELECT name, value FROM gauges")
+	rows, err := p.DB.QueryContext(ctx, "SELECT name, value FROM gauges")
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func (p *PostgresStorage) Gauges() (map[string]float64, error) {
 
 func (p *PostgresStorage) Counters() (map[string]int64, error) {
 	ctx := context.Background()
-	rows, err := p.Db.QueryContext(ctx, "SELECT name, value FROM counters")
+	rows, err := p.DB.QueryContext(ctx, "SELECT name, value FROM counters")
 	if err != nil {
 		return nil, err
 	}
@@ -156,5 +156,5 @@ func (p *PostgresStorage) Save() error {
 	return nil
 }
 func (p *PostgresStorage) Close() error {
-	return p.Db.Close()
+	return p.DB.Close()
 }
