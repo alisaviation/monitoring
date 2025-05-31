@@ -130,6 +130,9 @@ func (p *PostgresStorage) Gauges() (map[string]float64, error) {
 		}
 		gauges[name] = value
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return gauges, nil
 }
 
@@ -149,6 +152,9 @@ func (p *PostgresStorage) Counters() (map[string]int64, error) {
 			return nil, err
 		}
 		counters[name] = value
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return counters, nil
 }
