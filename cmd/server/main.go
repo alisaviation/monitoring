@@ -138,6 +138,7 @@ func run(storageInstance storage.Storage, srv *http.Server, storeInterval time.D
 	r.Post("/value/", helpers.MethodCheck([]string{http.MethodPost})(srvr.GetValue))
 	r.Get("/", helpers.MethodCheck([]string{http.MethodGet})(srvr.GetMetricsList))
 	r.Get("/ping", helpers.MethodCheck([]string{http.MethodGet})(srvr.PingHandler))
+	r.Post("/updates/", helpers.MethodCheck([]string{http.MethodPost})(srvr.UpdateBatchMetrics))
 
 	srv.Handler = r
 	return srv.ListenAndServe()
