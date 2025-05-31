@@ -12,7 +12,6 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/alisaviation/monitoring/internal/helpers"
-
 	"github.com/alisaviation/monitoring/internal/models"
 	"github.com/alisaviation/monitoring/internal/storage"
 )
@@ -35,7 +34,7 @@ func (s *Server) PingHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.DB.Ping(); err != nil {
+	if err := s.DB.PingContext(r.Context()); err != nil {
 		http.Error(w, "Database connection failed", http.StatusInternalServerError)
 		return
 	}
@@ -61,85 +60,47 @@ func (s *Server) UpdateJSONMetrics(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Bad Request: invalid JSON", http.StatusBadRequest)
 		return
 	}
-
-	switch metrics.MType {
-	case models.Gauge:
-		if metrics.Value == nil {
-			http.Error(w, "Bad Request: value is required for gauge", http.StatusBadRequest)
-			return
-		}
-		if err := s.Storage.SetGauge(metrics.ID, *metrics.Value); err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-		metrics.Value, _ = s.Storage.GetGauge(metrics.ID)
-
-	case models.Counter:
-		if metrics.Delta == nil {
-			http.Error(w, "Bad Request: delta is required for counter", http.StatusBadRequest)
-			return
-		}
-		if err := s.Storage.AddCounter(metrics.ID, *metrics.Delta); err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-		metrics.Delta, _ = s.Storage.GetCounter(metrics.ID)
-
-	default:
-		http.Error(w, "Bad Request: invalid metric type", http.StatusBadRequest)
+	if err := s.updateMetric(metrics); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	jsonData, err := json.Marshal(metrics)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-	w.Write(jsonData)
+	s.respondWithMetric(w, metrics)
 }
 
 func (s *Server) UpdateTextMetrics(w http.ResponseWriter, r *http.Request) {
+	metric := models.Metric{
+		ID:    chi.URLParam(r, "name"),
+		MType: chi.URLParam(r, "type"),
+	}
 
-	var metrics models.Metric
-	valueStr := chi.URLParam(r, "value")
-	metrics.ID = chi.URLParam(r, "name")
-	metrics.MType = chi.URLParam(r, "type")
-
-	switch metrics.MType {
+	switch metric.MType {
 	case models.Gauge:
+		valueStr := chi.URLParam(r, "value")
 		value, err := strconv.ParseFloat(valueStr, 64)
 		if err != nil {
 			http.Error(w, "Bad Request: invalid gauge value", http.StatusBadRequest)
 			return
 		}
-		if err := s.Storage.SetGauge(metrics.ID, value); err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-		metrics.Value, _ = s.Storage.GetGauge(metrics.ID)
-
+		metric.Value = &value
 	case models.Counter:
+		valueStr := chi.URLParam(r, "value")
 		delta, err := strconv.ParseInt(valueStr, 10, 64)
 		if err != nil {
 			http.Error(w, "Bad Request: invalid counter value", http.StatusBadRequest)
 			return
 		}
-		if err := s.Storage.AddCounter(metrics.ID, delta); err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-		metrics.Delta, _ = s.Storage.GetCounter(metrics.ID)
-
+		metric.Delta = &delta
 	default:
 		http.Error(w, "Bad Request: invalid metric type", http.StatusBadRequest)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	jsonData, err := json.Marshal(metrics)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
 
+	if err := s.updateMetric(metric); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
-	w.Write(jsonData)
+
+	s.respondWithMetric(w, metric)
 }
 
 func (s *Server) GetValue(w http.ResponseWriter, r *http.Request) {
@@ -242,33 +203,6 @@ func (s *Server) GetTextValue(w http.ResponseWriter, r *http.Request) models.Met
 	return metrics
 }
 
-func (s *Server) GetMetricsList(w http.ResponseWriter, r *http.Request) {
-	var response strings.Builder
-
-	response.WriteString("<html><body><h1>Metrics</h1><ul>")
-
-	gauges, err := s.Storage.Gauges()
-	if err == nil {
-		for name, value := range gauges {
-			response.WriteString(fmt.Sprintf("<li>%s: %s</li>", name, helpers.FormatFloat(value)))
-		}
-	}
-
-	counters, err := s.Storage.Counters()
-	if err == nil {
-		for name, value := range counters {
-			response.WriteString(fmt.Sprintf("<li>%s: %d</li>", name, value))
-		}
-	}
-
-	response.WriteString("</ul></body></html>")
-
-	w.Header().Set("Content-Type", "text/html")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(response.String()))
-
-}
-
 func (s *Server) UpdateBatchMetrics(w http.ResponseWriter, r *http.Request) {
 	var metrics []models.Metric
 	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
@@ -358,29 +292,63 @@ func (s *Server) UpdateBatchMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func updateMetricInTx(tx *sql.Tx, metric models.Metric) error {
+func (s *Server) GetMetricsList(w http.ResponseWriter, r *http.Request) {
+	var response strings.Builder
+
+	response.WriteString("<html><body><h1>Metrics</h1><ul>")
+
+	gauges, err := s.Storage.Gauges()
+	if err == nil {
+		for name, value := range gauges {
+			response.WriteString(fmt.Sprintf("<li>%s: %s</li>", name, helpers.FormatFloat(value)))
+		}
+	}
+
+	counters, err := s.Storage.Counters()
+	if err == nil {
+		for name, value := range counters {
+			response.WriteString(fmt.Sprintf("<li>%s: %d</li>", name, value))
+		}
+	}
+
+	response.WriteString("</ul></body></html>")
+
+	w.Header().Set("Content-Type", "text/html")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(response.String()))
+
+}
+
+func (s *Server) respondWithMetric(w http.ResponseWriter, metric models.Metric) {
 	switch metric.MType {
 	case models.Gauge:
+		if value, exists := s.Storage.GetGauge(metric.ID); exists {
+			metric.Value = value
+		}
+	case models.Counter:
+		if delta, exists := s.Storage.GetCounter(metric.ID); exists {
+			metric.Delta = delta
+		}
+	}
 
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(metric); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) updateMetric(metric models.Metric) error {
+	switch metric.MType {
+	case models.Gauge:
 		if metric.Value == nil {
 			return fmt.Errorf("value is required for gauge")
 		}
-		_, err := tx.Exec(`
-            INSERT INTO gauges (name, value)
-            VALUES ($1, $2)
-            ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value
-        `, metric.ID, *metric.Value)
-		return err
+		return s.Storage.SetGauge(metric.ID, *metric.Value)
 	case models.Counter:
 		if metric.Delta == nil {
 			return fmt.Errorf("delta is required for counter")
 		}
-		_, err := tx.Exec(`
-            INSERT INTO counters (name, value)
-            VALUES ($1, $2)
-            ON CONFLICT (name) DO UPDATE SET value = counters.value + EXCLUDED.value
-        `, metric.ID, *metric.Delta)
-		return err
+		return s.Storage.AddCounter(metric.ID, *metric.Delta)
 	default:
 		return fmt.Errorf("invalid metric type")
 	}
