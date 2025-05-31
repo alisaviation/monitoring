@@ -40,15 +40,16 @@ func (s *Sender) compressData(data []byte) ([]byte, error) {
 }
 
 func (s *Sender) SendMetrics(metrics map[string]*models.Metric) {
+	var metricsData models.Metric
 	for name, metric := range metrics {
 
-		var metricsData models.Metric
 		metricsData.ID = name
 		metricsData.MType = metric.MType
 
 		if metric.MType == models.Gauge {
 			metricsData.Value = metric.Value
-		} else if metric.MType == models.Counter {
+		}
+		if metric.MType == models.Counter {
 			metricsData.Delta = metric.Delta
 		}
 
@@ -57,30 +58,7 @@ func (s *Sender) SendMetrics(metrics map[string]*models.Metric) {
 			logger.Log.Error("Error marshaling JSON", zap.Error(err))
 			continue
 		}
-
-		compressedData, err := s.compressData(jsonData)
-		if err != nil {
-			logger.Log.Error("Error compressing data", zap.Error(err))
-			continue
-		}
-
-		resp, err := s.client.R().
-			SetHeader("Content-Type", "application/json").
-			SetHeader("Content-Encoding", "gzip").
-			SetBody(compressedData).
-			Post("http://" + s.serverAddress + "/update/")
-		if err != nil {
-			logger.Log.Error("Error sending request", zap.Error(err))
-			continue
-		}
-
-		if resp != nil {
-			defer resp.RawResponse.Body.Close()
-		}
-
-		if resp.StatusCode() != http.StatusOK {
-			logger.Log.Error("Error response from server", zap.String("status", resp.Status()))
-		}
+		s.sender(jsonData)
 	}
 }
 
@@ -122,4 +100,59 @@ func (s *Sender) GetMetric(metric *models.Metric) (*models.Metric, error) {
 	}
 
 	return &receivedMetric, nil
+}
+
+func (s *Sender) SendMetricsBatch(metrics map[string]*models.Metric) {
+	if len(metrics) == 0 {
+		logger.Log.Error("Error, the batch is empty")
+		return
+	}
+
+	var metricsList []models.Metric
+	for name, metric := range metrics {
+		batchMetrics := models.Metric{
+			ID:    name,
+			MType: metric.MType,
+		}
+		if metric.MType == models.Gauge {
+			batchMetrics.Value = metric.Value
+		}
+		if metric.MType == models.Counter {
+			batchMetrics.Delta = metric.Delta
+		}
+		metricsList = append(metricsList, batchMetrics)
+	}
+
+	jsonData, err := json.Marshal(metricsList)
+	if err != nil {
+		logger.Log.Error("Error marshaling JSON", zap.Error(err))
+		return
+	}
+	s.sender(jsonData)
+}
+func (s *Sender) sender(jsonData []byte) {
+	compressedData, err := s.compressData(jsonData)
+	if err != nil {
+		logger.Log.Error("Error compressing data", zap.Error(err))
+		return
+	}
+
+	resp, err := s.client.R().
+		SetHeader("Content-Type", "application/json").
+		SetHeader("Content-Encoding", "gzip").
+		SetBody(compressedData).
+		Post("http://" + s.serverAddress + "/updates/")
+	if err != nil {
+		logger.Log.Error("Error sending request", zap.Error(err))
+		return
+	}
+
+	if resp != nil {
+		defer resp.RawResponse.Body.Close()
+	}
+
+	if resp.StatusCode() != http.StatusOK {
+		logger.Log.Error("Error response from server", zap.String("status", resp.Status()))
+	}
+
 }
