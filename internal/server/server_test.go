@@ -38,10 +38,12 @@ func Test_methodCheck(t *testing.T) {
 
 	handler.Post("/update/{type}/{name}/{value}", helpers.MethodCheck([]string{http.MethodPost})(server.UpdateMetrics))
 	handler.Get("/value/{type}/{name}", helpers.MethodCheck([]string{http.MethodGet})(server.GetValue))
+	handler.Post("/update/", helpers.MethodCheck([]string{http.MethodPost})(server.UpdateMetrics))
 	handler.Post("/value/", helpers.MethodCheck([]string{http.MethodPost})(server.GetValue))
 	handler.Get("/value/", helpers.MethodCheck([]string{http.MethodGet})(server.GetValue))
 	handler.Get("/", helpers.MethodCheck([]string{http.MethodGet})(server.GetMetricsList))
 	handler.Get("/ping", helpers.MethodCheck([]string{http.MethodGet})(server.PingHandler))
+	handler.Post("/updates/", helpers.MethodCheck([]string{http.MethodPost})(server.UpdateBatchMetrics))
 
 	tests := []struct {
 		name         string
@@ -153,6 +155,21 @@ func Test_methodCheck(t *testing.T) {
 			"",
 			nil,
 		},
+		{
+			"POST Update Gauge Text",
+			http.MethodPost,
+			"/update/gauge/metric1/123.45",
+			"", http.StatusOK,
+			"",
+			nil},
+		{
+			"POST Update Counter Text",
+			http.MethodPost,
+			"/update/counter/metric2/100",
+			"",
+			http.StatusOK,
+			"",
+			nil},
 	}
 
 	for _, tt := range tests {

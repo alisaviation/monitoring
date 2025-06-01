@@ -5,44 +5,25 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/jackc/pgerrcode"
 	"github.com/lib/pq"
 
+	"github.com/alisaviation/monitoring/internal/helpers"
 	"github.com/alisaviation/monitoring/internal/models"
 )
-
-const (
-	maxRetries   = 3
-	initialDelay = 1 * time.Second
-	secondDelay  = 3 * time.Second
-	thirdDelay   = 5 * time.Second
-)
-
-func (s *Server) isRetriableDBError(err error) bool {
-	var pqErr *pq.Error
-	if errors.As(err, &pqErr) {
-		switch pqErr.Code {
-		case pgerrcode.ConnectionException,
-			pgerrcode.ConnectionDoesNotExist,
-			pgerrcode.ConnectionFailure,
-			pgerrcode.SQLClientUnableToEstablishSQLConnection,
-			pgerrcode.SQLServerRejectedEstablishmentOfSQLConnection,
-			pgerrcode.TransactionResolutionUnknown,
-			pgerrcode.SerializationFailure:
-			return true
-		}
-	}
-	return false
-}
 
 func updateMetricInTx(tx *sql.Tx, metric models.Metric) error {
 	switch metric.MType {
 	case models.Gauge:
 
 		if metric.Value == nil {
-			return fmt.Errorf("value is required for gauge")
+			return &helpers.HTTPError{
+				StatusCode: http.StatusBadRequest,
+				Message:    "Bad Request: value is required for gauge",
+			}
 		}
 		_, err := tx.Exec(`
             INSERT INTO gauges (name, value)
@@ -52,7 +33,10 @@ func updateMetricInTx(tx *sql.Tx, metric models.Metric) error {
 		return err
 	case models.Counter:
 		if metric.Delta == nil {
-			return fmt.Errorf("delta is required for counter")
+			return &helpers.HTTPError{
+				StatusCode: http.StatusBadRequest,
+				Message:    "Bad Request: delta is required for counter",
+			}
 		}
 		_, err := tx.Exec(`
             INSERT INTO counters (name, value)
@@ -61,20 +45,23 @@ func updateMetricInTx(tx *sql.Tx, metric models.Metric) error {
         `, metric.ID, *metric.Delta)
 		return err
 	default:
-		return fmt.Errorf("invalid metric type")
+		return &helpers.HTTPError{
+			StatusCode: http.StatusBadRequest,
+			Message:    "Bad Request: invalid metric type",
+		}
 	}
 }
 
 func (s *Server) execInTransactionWithRetry(ctx context.Context, fn func(tx *sql.Tx) error) error {
-	retryDelays := [maxRetries]time.Duration{initialDelay, secondDelay, thirdDelay}
+	retryDelays := [helpers.MaxRetries]time.Duration{helpers.InitialDelay, helpers.SecondDelay, helpers.ThirdDelay}
 	var lastErr error
 
-	for attempt := 0; attempt <= maxRetries; attempt++ {
+	for attempt := 0; attempt <= helpers.MaxRetries; attempt++ {
 		tx, err := s.DB.BeginTx(ctx, nil)
 		if err != nil {
-			if s.isRetriableDBError(err) {
+			if helpers.IsRetriablePostgresError(err) {
 				lastErr = err
-				goto retry
+				return s.handleRetry(ctx, attempt, retryDelays, lastErr)
 			}
 			return fmt.Errorf("begin transaction failed: %w", err)
 		}
@@ -87,33 +74,36 @@ func (s *Server) execInTransactionWithRetry(ctx context.Context, fn func(tx *sql
 				return fmt.Errorf("unique violation: %w", err)
 			}
 
-			if s.isRetriableDBError(err) {
+			if helpers.IsRetriablePostgresError(err) {
 				lastErr = err
-				goto retry
+				return s.handleRetry(ctx, attempt, retryDelays, lastErr)
 			}
 			return err
 		}
 
 		if err := tx.Commit(); err != nil {
-			if s.isRetriableDBError(err) {
+			if helpers.IsRetriablePostgresError(err) {
 				lastErr = err
-				goto retry
+				return s.handleRetry(ctx, attempt, retryDelays, lastErr)
 			}
 			return fmt.Errorf("commit failed: %w", err)
 		}
 
 		return nil
-
-	retry:
-		if attempt < maxRetries {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(retryDelays[attempt]):
-				continue
-			}
-		}
 	}
 
-	return fmt.Errorf("after %d attempts: %w", maxRetries, lastErr)
+	return fmt.Errorf("after %d attempts: %w", helpers.MaxRetries, lastErr)
+
+}
+
+func (s *Server) handleRetry(ctx context.Context, attempt int, retryDelays [helpers.MaxRetries]time.Duration, lastErr error) error {
+	if attempt < helpers.MaxRetries {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(retryDelays[attempt]):
+			return nil
+		}
+	}
+	return fmt.Errorf("after %d attempts: %w", helpers.MaxRetries, lastErr)
 }

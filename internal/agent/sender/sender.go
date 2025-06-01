@@ -1,30 +1,18 @@
 package sender
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"time"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/jackc/pgerrcode"
-	"github.com/lib/pq"
 	"go.uber.org/zap"
 
+	"github.com/alisaviation/monitoring/internal/helpers"
 	"github.com/alisaviation/monitoring/internal/logger"
 	"github.com/alisaviation/monitoring/internal/models"
-)
-
-const (
-	maxRetries   = 3
-	initialDelay = 1 * time.Second
-	secondDelay  = 3 * time.Second
-	thirdDelay   = 5 * time.Second
 )
 
 type Sender struct {
@@ -39,20 +27,6 @@ func NewSender(serverAddress string) *Sender {
 		serverAddress: serverAddress,
 		client:        client,
 	}
-}
-
-func (s *Sender) compressData(data []byte) ([]byte, error) {
-	var buf bytes.Buffer
-	gz := gzip.NewWriter(&buf)
-	if _, err := gz.Write(data); err != nil {
-		logger.Log.Error("gzip write error: ", zap.Error(err))
-		return nil, err
-	}
-	if err := gz.Close(); err != nil {
-		logger.Log.Error("gzip close error: ", zap.Error(err))
-		return nil, err
-	}
-	return buf.Bytes(), nil
 }
 
 func (s *Sender) SendMetricsBatch(ctx context.Context, metrics map[string]*models.Metric) error {
@@ -87,64 +61,11 @@ func (s *Sender) SendMetricsBatch(ctx context.Context, metrics map[string]*model
 	return nil
 }
 
-func (s *Sender) isRetriableError(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	var (
-		netErr  net.Error
-		dnsErr  *net.DNSError
-		pqErr   *pq.Error
-		respErr *resty.ResponseError
-	)
-
-	switch {
-	case errors.As(err, &netErr) && netErr.Timeout():
-		return true
-	case errors.As(err, &dnsErr) && dnsErr.IsTemporary:
-		return true
-	case errors.As(err, &pqErr) && isRetriablePqError(pqErr):
-		return true
-	case errors.As(err, &respErr) && isRetriableHTTPStatus(respErr.Response.StatusCode()):
-		return true
-	default:
-		return false
-	}
-}
-
-func isRetriablePqError(err *pq.Error) bool {
-	switch err.Code {
-	case pgerrcode.ConnectionException,
-		pgerrcode.ConnectionDoesNotExist,
-		pgerrcode.ConnectionFailure,
-		pgerrcode.SQLClientUnableToEstablishSQLConnection,
-		pgerrcode.SQLServerRejectedEstablishmentOfSQLConnection,
-		pgerrcode.TransactionResolutionUnknown,
-		pgerrcode.SerializationFailure:
-		return true
-	}
-	return false
-}
-
-func isRetriableHTTPStatus(status int) bool {
-	return status == http.StatusRequestTimeout ||
-		status == http.StatusTooManyRequests ||
-		status == http.StatusServiceUnavailable ||
-		status == http.StatusGatewayTimeout
-}
-
-var (
-	ErrMaxRetriesExceeded = errors.New("maximum retry attempts exceeded")
-	ErrNonRetriable       = errors.New("non-retriable error occurred")
-	ErrEmptyBatch         = errors.New("metrics batch is empty")
-)
-
 func (s *Sender) sendWithRetry(ctx context.Context, endpoint string, data []byte, result interface{}) error {
-	retryDelays := [maxRetries]time.Duration{initialDelay, secondDelay, thirdDelay}
+	retryDelays := [helpers.MaxRetries]time.Duration{helpers.InitialDelay, helpers.SecondDelay, helpers.ThirdDelay}
 	var lastErr error
 
-	for attempt := 0; attempt <= maxRetries; attempt++ {
+	for attempt := 0; attempt <= helpers.MaxRetries; attempt++ {
 		req, err := s.prepareRequest(ctx, endpoint, data)
 		if err != nil {
 			logger.Log.Error("Error preparing request", zap.Error(err))
@@ -192,7 +113,7 @@ func (s *Sender) sendWithRetry(ctx context.Context, endpoint string, data []byte
 				zap.Error(err))
 		}
 
-		if attempt < maxRetries {
+		if attempt < helpers.MaxRetries {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -204,18 +125,4 @@ func (s *Sender) sendWithRetry(ctx context.Context, endpoint string, data []byte
 
 	logger.Log.Error("Max retries exceeded", zap.Error(lastErr))
 	return fmt.Errorf("%w: last error: %v", ErrMaxRetriesExceeded, lastErr)
-}
-
-func (s *Sender) prepareRequest(ctx context.Context, endpoint string, data []byte) (*resty.Request, error) {
-	compressedData, err := s.compressData(data)
-	if err != nil {
-		logger.Log.Error("Error compressing data", zap.Error(err))
-		return nil, err
-	}
-
-	return s.client.R().
-		SetContext(ctx).
-		SetHeader("Content-Type", "application/json").
-		SetHeader("Content-Encoding", "gzip").
-		SetBody(compressedData), nil
 }
