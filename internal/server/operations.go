@@ -61,7 +61,10 @@ func (s *Server) execInTransactionWithRetry(ctx context.Context, fn func(tx *sql
 		if err != nil {
 			if helpers.IsRetriablePostgresError(err) {
 				lastErr = err
-				return s.handleRetry(ctx, attempt, retryDelays, lastErr)
+				if err := s.handleRetry(ctx, attempt, retryDelays, lastErr); err != nil {
+					return err
+				}
+				continue
 			}
 			return fmt.Errorf("begin transaction failed: %w", err)
 		}
@@ -76,7 +79,10 @@ func (s *Server) execInTransactionWithRetry(ctx context.Context, fn func(tx *sql
 
 			if helpers.IsRetriablePostgresError(err) {
 				lastErr = err
-				return s.handleRetry(ctx, attempt, retryDelays, lastErr)
+				if err := s.handleRetry(ctx, attempt, retryDelays, lastErr); err != nil {
+					return err
+				}
+				continue
 			}
 			return err
 		}
@@ -84,7 +90,10 @@ func (s *Server) execInTransactionWithRetry(ctx context.Context, fn func(tx *sql
 		if err := tx.Commit(); err != nil {
 			if helpers.IsRetriablePostgresError(err) {
 				lastErr = err
-				return s.handleRetry(ctx, attempt, retryDelays, lastErr)
+				if err := s.handleRetry(ctx, attempt, retryDelays, lastErr); err != nil {
+					return err
+				}
+				continue
 			}
 			return fmt.Errorf("commit failed: %w", err)
 		}
