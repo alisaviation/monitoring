@@ -56,7 +56,7 @@ func SyncSaveMiddleware(storeInterval time.Duration, storage storage.Storage) fu
 					prevGauges = make(map[string]float64)
 					prevCounters = make(map[string]int64)
 
-					gauges, err := storage.Gauges()
+					gauges, err := storage.Gauges(r.Context())
 					if err != nil {
 						log.Println("Error getting gauges:", err)
 					} else {
@@ -65,7 +65,7 @@ func SyncSaveMiddleware(storeInterval time.Duration, storage storage.Storage) fu
 						}
 					}
 
-					counters, err := storage.Counters()
+					counters, err := storage.Counters(r.Context())
 					if err != nil {
 						log.Println("Error getting counters:", err)
 					} else {
@@ -79,7 +79,7 @@ func SyncSaveMiddleware(storeInterval time.Duration, storage storage.Storage) fu
 					ResponseWriter: w,
 					onWriteHeader: func() {
 						if storeInterval == 0 {
-							helpers.CheckAndSaveMetrics(storage, prevGauges, prevCounters)
+							helpers.CheckAndSaveMetrics(r.Context(), storage, prevGauges, prevCounters)
 						}
 					},
 				}

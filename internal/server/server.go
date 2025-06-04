@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -48,7 +49,7 @@ func (s *Server) UpdateMetrics(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
 	switch {
 	case strings.Contains(contentType, "application/json"):
-		s.UpdateJSONMetrics(w, r)
+		s.UpdateJSONMetrics(r.Context(), w, r)
 	case strings.Contains(contentType, "text/plain"), contentType == "":
 		s.UpdateTextMetrics(w, r)
 	default:
@@ -56,13 +57,13 @@ func (s *Server) UpdateMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) UpdateJSONMetrics(w http.ResponseWriter, r *http.Request) {
+func (s *Server) UpdateJSONMetrics(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 	var metrics models.Metric
 	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
 		http.Error(w, "Bad Request: invalid JSON", http.StatusBadRequest)
 		return
 	}
-	if err := s.updateMetric(metrics); err != nil {
+	if err := s.updateMetric(ctx, metrics); err != nil {
 		var httpErr *helpers.HTTPError
 		if errors.As(err, &httpErr) {
 			http.Error(w, httpErr.Message, httpErr.StatusCode)
@@ -71,7 +72,7 @@ func (s *Server) UpdateJSONMetrics(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	s.respondWithMetric(w, metrics)
+	s.respondWithMetric(ctx, w, metrics)
 }
 
 func (s *Server) UpdateTextMetrics(w http.ResponseWriter, r *http.Request) {
@@ -102,7 +103,7 @@ func (s *Server) UpdateTextMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.updateMetric(metric); err != nil {
+	if err := s.updateMetric(r.Context(), metric); err != nil {
 		var httpErr *helpers.HTTPError
 		if errors.As(err, &httpErr) {
 			http.Error(w, httpErr.Message, httpErr.StatusCode)
@@ -112,7 +113,7 @@ func (s *Server) UpdateTextMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.respondWithMetric(w, metric)
+	s.respondWithMetric(r.Context(), w, metric)
 }
 
 func (s *Server) GetValue(w http.ResponseWriter, r *http.Request) {
@@ -121,7 +122,7 @@ func (s *Server) GetValue(w http.ResponseWriter, r *http.Request) {
 
 	switch {
 	case strings.Contains(contentType, "application/json"):
-		metrics := s.GetJSONValue(w, r)
+		metrics := s.GetJSONValue(r.Context(), w, r)
 		if metrics.ID == "" {
 			return
 		}
@@ -134,7 +135,7 @@ func (s *Server) GetValue(w http.ResponseWriter, r *http.Request) {
 		w.Write(jsonData)
 		return
 	default:
-		metrics := s.GetTextValue(w, r)
+		metrics := s.GetTextValue(r.Context(), w, r)
 		if metrics.ID == "" {
 			return
 		}
@@ -159,7 +160,7 @@ func (s *Server) GetValue(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, response)
 }
 
-func (s *Server) GetJSONValue(w http.ResponseWriter, r *http.Request) models.Metric {
+func (s *Server) GetJSONValue(ctx context.Context, w http.ResponseWriter, r *http.Request) models.Metric {
 	var metrics models.Metric
 	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -168,15 +169,15 @@ func (s *Server) GetJSONValue(w http.ResponseWriter, r *http.Request) models.Met
 
 	switch metrics.MType {
 	case models.Gauge:
-		value, exists := s.Storage.GetGauge(metrics.ID)
-		if !exists {
+		value, err := s.Storage.GetGauge(ctx, metrics.ID)
+		if err != nil {
 			http.Error(w, "Not Found  gauge in GetJSONValue", http.StatusNotFound)
 			return models.Metric{}
 		}
 		metrics.Value = value
 	case models.Counter:
-		delta, exists := s.Storage.GetCounter(metrics.ID)
-		if !exists {
+		delta, err := s.Storage.GetCounter(ctx, metrics.ID)
+		if err != nil {
 			http.Error(w, "Not Found  couner in GetJSONValue", http.StatusNotFound)
 			return models.Metric{}
 		}
@@ -187,7 +188,7 @@ func (s *Server) GetJSONValue(w http.ResponseWriter, r *http.Request) models.Met
 	return metrics
 }
 
-func (s *Server) GetTextValue(w http.ResponseWriter, r *http.Request) models.Metric {
+func (s *Server) GetTextValue(ctx context.Context, w http.ResponseWriter, r *http.Request) models.Metric {
 	var metrics models.Metric
 
 	metrics.ID = chi.URLParam(r, "name")
@@ -195,15 +196,15 @@ func (s *Server) GetTextValue(w http.ResponseWriter, r *http.Request) models.Met
 
 	switch metrics.MType {
 	case models.Gauge:
-		value, exists := s.Storage.GetGauge(metrics.ID)
-		if !exists {
+		value, err := s.Storage.GetGauge(ctx, metrics.ID)
+		if err != nil {
 			http.Error(w, "Not Found gauge value in GetTextValue", http.StatusNotFound)
 			return models.Metric{}
 		}
 		metrics.Value = value
 	case models.Counter:
-		delta, exists := s.Storage.GetCounter(metrics.ID)
-		if !exists {
+		delta, err := s.Storage.GetCounter(ctx, metrics.ID)
+		if err != nil {
 			http.Error(w, "Not Found conter value in GetTextValue", http.StatusNotFound)
 			return models.Metric{}
 		}
@@ -247,7 +248,7 @@ func (s *Server) UpdateBatchMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.DB == nil {
 		for _, metric := range metrics {
-			if err := s.updateMetric(metric); err != nil {
+			if err := s.updateMetric(r.Context(), metric); err != nil {
 				var httpErr *helpers.HTTPError
 				if errors.As(err, &httpErr) {
 					http.Error(w, httpErr.Message, httpErr.StatusCode)
@@ -266,10 +267,10 @@ func (s *Server) UpdateBatchMetrics(w http.ResponseWriter, r *http.Request) {
 
 		switch metric.MType {
 		case models.Gauge:
-			value, _ := s.Storage.GetGauge(metric.ID)
+			value, _ := s.Storage.GetGauge(r.Context(), metric.ID)
 			updatedMetric.Value = value
 		case models.Counter:
-			delta, _ := s.Storage.GetCounter(metric.ID)
+			delta, _ := s.Storage.GetCounter(r.Context(), metric.ID)
 			updatedMetric.Delta = delta
 		}
 
@@ -288,14 +289,14 @@ func (s *Server) GetMetricsList(w http.ResponseWriter, r *http.Request) {
 
 	response.WriteString("<html><body><h1>Metrics</h1><ul>")
 
-	gauges, err := s.Storage.Gauges()
+	gauges, err := s.Storage.Gauges(r.Context())
 	if err == nil {
 		for name, value := range gauges {
 			response.WriteString(fmt.Sprintf("<li>%s: %s</li>", name, helpers.FormatFloat(value)))
 		}
 	}
 
-	counters, err := s.Storage.Counters()
+	counters, err := s.Storage.Counters(r.Context())
 	if err == nil {
 		for name, value := range counters {
 			response.WriteString(fmt.Sprintf("<li>%s: %d</li>", name, value))
@@ -310,14 +311,16 @@ func (s *Server) GetMetricsList(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (s *Server) respondWithMetric(w http.ResponseWriter, metric models.Metric) {
+func (s *Server) respondWithMetric(ctx context.Context, w http.ResponseWriter, metric models.Metric) {
 	switch metric.MType {
 	case models.Gauge:
-		if value, exists := s.Storage.GetGauge(metric.ID); exists {
+		value, err := s.Storage.GetGauge(ctx, metric.ID)
+		if err != nil {
 			metric.Value = value
 		}
 	case models.Counter:
-		if delta, exists := s.Storage.GetCounter(metric.ID); exists {
+		delta, err := s.Storage.GetCounter(ctx, metric.ID)
+		if err != nil {
 			metric.Delta = delta
 		}
 	}
@@ -328,7 +331,7 @@ func (s *Server) respondWithMetric(w http.ResponseWriter, metric models.Metric) 
 	}
 }
 
-func (s *Server) updateMetric(metric models.Metric) error {
+func (s *Server) updateMetric(ctx context.Context, metric models.Metric) error {
 	switch metric.MType {
 	case models.Gauge:
 		if metric.Value == nil {
@@ -337,7 +340,7 @@ func (s *Server) updateMetric(metric models.Metric) error {
 				Message:    "Bad Request: value is required for gauge",
 			}
 		}
-		return s.Storage.SetGauge(metric.ID, *metric.Value)
+		return s.Storage.SetGauge(ctx, metric.ID, *metric.Value)
 	case models.Counter:
 		if metric.Delta == nil {
 			return &helpers.HTTPError{
@@ -345,7 +348,7 @@ func (s *Server) updateMetric(metric models.Metric) error {
 				Message:    "Bad Request: delta is required for counter",
 			}
 		}
-		return s.Storage.AddCounter(metric.ID, *metric.Delta)
+		return s.Storage.AddCounter(ctx, metric.ID, *metric.Delta)
 	default:
 		return &helpers.HTTPError{
 			StatusCode: http.StatusBadRequest,

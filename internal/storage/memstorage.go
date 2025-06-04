@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"os"
 	"sync"
@@ -21,41 +23,47 @@ func NewMemStorage(filePath string) *MemStorage {
 	}
 }
 
-func (m *MemStorage) SetGauge(name string, value float64) error {
+func (m *MemStorage) SetGauge(ctx context.Context, name string, value float64) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.gauges[name] = value
 	return nil
 }
 
-func (m *MemStorage) AddCounter(name string, value int64) error {
+func (m *MemStorage) AddCounter(ctx context.Context, name string, value int64) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.counters[name] += value
 	return nil
 }
 
-func (m *MemStorage) GetGauge(name string) (*float64, bool) {
+func (m *MemStorage) GetGauge(ctx context.Context, name string) (*float64, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	value, exists := m.gauges[name]
-	return &value, exists
+	if !exists {
+		return nil, sql.ErrNoRows
+	}
+	return &value, nil
 }
 
-func (m *MemStorage) GetCounter(name string) (*int64, bool) {
+func (m *MemStorage) GetCounter(ctx context.Context, name string) (*int64, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	value, exists := m.counters[name]
-	return &value, exists
+	if !exists {
+		return nil, sql.ErrNoRows
+	}
+	return &value, nil
 }
 
-func (m *MemStorage) Gauges() (map[string]float64, error) {
+func (m *MemStorage) Gauges(ctx context.Context) (map[string]float64, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.gauges, nil
 }
 
-func (m *MemStorage) Counters() (map[string]int64, error) {
+func (m *MemStorage) Counters(ctx context.Context) (map[string]int64, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.counters, nil

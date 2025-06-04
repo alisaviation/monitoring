@@ -24,6 +24,8 @@ import (
 )
 
 func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	conf := config.SetConfigServer()
 	if len(flag.Args()) > 0 {
@@ -46,14 +48,11 @@ func main() {
 		}
 		defer db.Close()
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
 		if err = db.PingContext(ctx); err != nil {
 			logger.Log.Fatal("Failed to ping database", zap.Error(err))
 		}
 		logger.Log.Info("Successfully connected to database")
-		storageInstance, err = storage.NewPostgresStorageFromDB(db)
+		storageInstance, err = storage.NewPostgresStorageFromDB(ctx, db)
 		if err != nil {
 			logger.Log.Fatal("Failed to create Postgres storage", zap.Error(err))
 		}
@@ -114,7 +113,7 @@ func main() {
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
