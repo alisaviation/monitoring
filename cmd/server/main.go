@@ -39,7 +39,7 @@ func main() {
 	var storageInstance storage.Storage
 	var db *sql.DB
 
-	if conf.DatabaseDSN != "" {
+	if conf.DatabaseDSN != "" && db == nil {
 		logger.Log.Info("Connecting to DB", zap.String("dsn", conf.DatabaseDSN))
 		var err error
 		db, err = sql.Open("postgres", conf.DatabaseDSN)
@@ -48,9 +48,6 @@ func main() {
 		}
 		defer db.Close()
 
-		if err = db.PingContext(ctx); err != nil {
-			logger.Log.Fatal("Failed to ping database", zap.Error(err))
-		}
 		logger.Log.Info("Successfully connected to database")
 		storageInstance, err = storage.NewPostgresStorageFromDB(ctx, db)
 		if err != nil {

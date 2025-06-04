@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/jackc/pgerrcode"
+	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 )
 
@@ -151,4 +153,12 @@ func (p *PostgresStorage) Save() error {
 }
 func (p *PostgresStorage) Close() error {
 	return p.DB.Close()
+}
+
+func (s *PostgresStorage) IsUniqueViolationError(err error) bool {
+	var pqErr *pq.Error
+	if errors.As(err, &pqErr) && pqErr.Code == pgerrcode.UniqueViolation {
+		return true
+	}
+	return false
 }

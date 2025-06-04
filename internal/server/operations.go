@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/jackc/pgerrcode"
@@ -18,13 +17,6 @@ import (
 func updateMetricInTx(tx *sql.Tx, metric models.Metric) error {
 	switch metric.MType {
 	case models.Gauge:
-
-		if metric.Value == nil {
-			return &helpers.HTTPError{
-				StatusCode: http.StatusBadRequest,
-				Message:    "Bad Request: value is required for gauge",
-			}
-		}
 		_, err := tx.Exec(`
             INSERT INTO gauges (name, value)
             VALUES ($1, $2)
@@ -32,12 +24,6 @@ func updateMetricInTx(tx *sql.Tx, metric models.Metric) error {
         `, metric.ID, *metric.Value)
 		return err
 	case models.Counter:
-		if metric.Delta == nil {
-			return &helpers.HTTPError{
-				StatusCode: http.StatusBadRequest,
-				Message:    "Bad Request: delta is required for counter",
-			}
-		}
 		_, err := tx.Exec(`
             INSERT INTO counters (name, value)
             VALUES ($1, $2)
@@ -45,12 +31,44 @@ func updateMetricInTx(tx *sql.Tx, metric models.Metric) error {
         `, metric.ID, *metric.Delta)
 		return err
 	default:
-		return &helpers.HTTPError{
-			StatusCode: http.StatusBadRequest,
-			Message:    "Bad Request: invalid metric type",
-		}
+		return fmt.Errorf("invalid metric type")
 	}
 }
+
+//switch metric.MType {
+//case models.Gauge:
+//
+//	if metric.Value == nil {
+//		return &helpers.HTTPError{
+//			StatusCode: http.StatusBadRequest,
+//			Message:    "Bad Request: value is required for gauge",
+//		}
+//	}
+//	_, err := tx.Exec(`
+//        INSERT INTO gauges (name, value)
+//        VALUES ($1, $2)
+//        ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value
+//    `, metric.ID, *metric.Value)
+//	return err
+//case models.Counter:
+//	if metric.Delta == nil {
+//		return &helpers.HTTPError{
+//			StatusCode: http.StatusBadRequest,
+//			Message:    "Bad Request: delta is required for counter",
+//		}
+//	}
+//	_, err := tx.Exec(`
+//        INSERT INTO counters (name, value)
+//        VALUES ($1, $2)
+//        ON CONFLICT (name) DO UPDATE SET value = counters.value + EXCLUDED.value
+//    `, metric.ID, *metric.Delta)
+//	return err
+//default:
+//	return &helpers.HTTPError{
+//		StatusCode: http.StatusBadRequest,
+//		Message:    "Bad Request: invalid metric type",
+//	}
+//}
 
 func (s *Server) execInTransactionWithRetry(ctx context.Context, fn func(tx *sql.Tx) error) error {
 	retryDelays := [helpers.MaxRetries]time.Duration{helpers.InitialDelay, helpers.SecondDelay, helpers.ThirdDelay}

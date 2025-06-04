@@ -12,5 +12,5 @@ type Storage interface {
 	Gauges(ctx context.Context) (map[string]float64, error)
 	Counters(ctx context.Context) (map[string]int64, error)
 	Save() error
-	//IsUniqueViolationError() error
+	IsUniqueViolationError(err error) bool
 }

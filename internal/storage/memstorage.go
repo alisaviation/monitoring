@@ -121,3 +121,7 @@ func (m *MemStorage) Load() error {
 
 	return nil
 }
+
+func (m *MemStorage) IsUniqueViolationError(err error) bool {
+	return false
+}
