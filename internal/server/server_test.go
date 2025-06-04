@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -374,8 +375,8 @@ func Test_updateMetrics(t *testing.T) {
 
 func Test_getValue(t *testing.T) {
 	memStorage := storage.NewMemStorage("")
-	memStorage.SetGauge("metric1", 123.45)
-	memStorage.AddCounter("metric2", 100)
+	memStorage.SetGauge(context.Background(), "metric1", 123.45)
+	memStorage.AddCounter(context.Background(), "metric2", 100)
 	server := NewServer(memStorage, nil)
 
 	tests := []struct {
@@ -520,8 +521,8 @@ func Test_gzipSupport(t *testing.T) {
 	os.Args = []string{"cmd", "-a=localhost:8080", "-i=300", "-f=metrics.json", "-r=true"}
 
 	memStorage := storage.NewMemStorage("")
-	memStorage.SetGauge("test_gauge", 123.45)
-	memStorage.AddCounter("test_counter", 42)
+	memStorage.SetGauge(context.Background(), "test_gauge", 123.45)
+	memStorage.AddCounter(context.Background(), "test_counter", 42)
 	srv := &Server{Storage: memStorage, DB: nil}
 
 	testCases := []struct {
