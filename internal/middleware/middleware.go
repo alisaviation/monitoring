@@ -3,6 +3,7 @@ package middleware
 import (
 	"compress/gzip"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -44,7 +45,7 @@ func (g gzipWriter) Write(b []byte) (int, error) {
 	return g.Writer.Write(b)
 }
 
-func SyncSaveMiddleware(storeInterval time.Duration, storage *storage.MemStorage) func(next http.Handler) http.Handler {
+func SyncSaveMiddleware(storeInterval time.Duration, storage storage.Storage) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPost {
@@ -54,18 +55,31 @@ func SyncSaveMiddleware(storeInterval time.Duration, storage *storage.MemStorage
 				if storeInterval == 0 {
 					prevGauges = make(map[string]float64)
 					prevCounters = make(map[string]int64)
-					for k, v := range storage.Gauges() {
-						prevGauges[k] = v
+
+					gauges, err := storage.Gauges(r.Context())
+					if err != nil {
+						log.Println("Error getting gauges:", err)
+					} else {
+						for k, v := range gauges {
+							prevGauges[k] = v
+						}
 					}
-					for k, v := range storage.Counters() {
-						prevCounters[k] = v
+
+					counters, err := storage.Counters(r.Context())
+					if err != nil {
+						log.Println("Error getting counters:", err)
+					} else {
+						for k, v := range counters {
+							prevCounters[k] = v
+						}
 					}
+
 				}
 				ww := &responseWriterWrapper{
 					ResponseWriter: w,
 					onWriteHeader: func() {
 						if storeInterval == 0 {
-							helpers.CheckAndSaveMetrics(storage, prevGauges, prevCounters)
+							helpers.CheckAndSaveMetrics(r.Context(), storage, prevGauges, prevCounters)
 						}
 					},
 				}

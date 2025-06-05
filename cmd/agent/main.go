@@ -1,6 +1,11 @@
 package main
 
 import (
+	"context"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"go.uber.org/zap"
@@ -15,6 +20,22 @@ import (
 func main() {
 	conf := config.SetConfigAgent()
 
+	if err := logger.Initialize("info"); err != nil {
+		log.Fatalf("Failed to initialize logger: %v", err)
+	}
+	defer logger.Log.Sync()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		sig := <-sigChan
+		logger.Log.Info("Received signal, agent is shutting down...", zap.String("signal", sig.String()))
+		cancel()
+	}()
+
 	collectorInstance := collector.NewCollector()
 	senderInstance := sender.NewSender(conf.ServerAddress)
 	metricsBuffer := make(map[string]*models.Metric)
@@ -26,20 +47,28 @@ func main() {
 
 	for {
 		select {
+		case <-ctx.Done():
+			logger.Log.Info("Shutting down agent...")
+			if len(metricsBuffer) > 0 {
+				if err := senderInstance.SendMetricsBatch(ctx, metricsBuffer); err != nil {
+					logger.Log.Error("Failed to send final metrics batch", zap.Error(err))
+				}
+			}
+			return
+
 		case <-pollTicker.C:
 			metrics := collectorInstance.CollectMetrics()
 			collector.UpdateMetricsBuffer(metricsBuffer, metrics)
+			logger.Log.Debug("Collected metrics", zap.Int("count", len(metrics)))
 
 		case <-reportTicker.C:
-			senderInstance.SendMetrics(metricsBuffer)
-			metricsBuffer = make(map[string]*models.Metric)
-			for name, metric := range metricsBuffer {
-				receivedMetric, err := senderInstance.GetMetric(metric)
-				if err != nil {
-					logger.Log.Error("Error getting metric:", zap.Error(err))
+			if len(metricsBuffer) > 0 {
+				if err := senderInstance.SendMetricsBatch(ctx, metricsBuffer); err != nil {
+					logger.Log.Error("Failed to send metrics batch", zap.Error(err))
 					continue
 				}
-				metricsBuffer[name] = receivedMetric
+				logger.Log.Debug("Metrics batch sent", zap.Int("count", len(metricsBuffer)))
+				metricsBuffer = make(map[string]*models.Metric)
 			}
 		}
 	}

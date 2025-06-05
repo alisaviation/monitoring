@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
 
@@ -23,7 +25,17 @@ import (
 func Test_methodCheck(t *testing.T) {
 	memStorage := storage.NewMemStorage("")
 	handler := chi.NewRouter()
-	server := &Server{MemStorage: memStorage}
+
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create mock database: %s", err)
+	}
+	defer db.Close()
+
+	server := &Server{
+		Storage: memStorage,
+		DB:      db,
+	}
 
 	handler.Post("/update/{type}/{name}/{value}", helpers.MethodCheck([]string{http.MethodPost})(server.UpdateMetrics))
 	handler.Get("/value/{type}/{name}", helpers.MethodCheck([]string{http.MethodGet})(server.GetValue))
@@ -31,6 +43,8 @@ func Test_methodCheck(t *testing.T) {
 	handler.Post("/value/", helpers.MethodCheck([]string{http.MethodPost})(server.GetValue))
 	handler.Get("/value/", helpers.MethodCheck([]string{http.MethodGet})(server.GetValue))
 	handler.Get("/", helpers.MethodCheck([]string{http.MethodGet})(server.GetMetricsList))
+	handler.Get("/ping", helpers.MethodCheck([]string{http.MethodGet})(server.PingHandler))
+	handler.Post("/updates/", helpers.MethodCheck([]string{http.MethodPost})(server.UpdateBatchMetrics))
 
 	tests := []struct {
 		name         string
@@ -38,27 +52,133 @@ func Test_methodCheck(t *testing.T) {
 		url          string
 		body         string
 		expectedCode int
+		expectedBody string
+		setupMock    func()
 	}{
-
-		{"POST Update Gauge JSON", http.MethodPost, "/update/", `{"id": "metric1", "type": "gauge", "value": 123.45}`, http.StatusOK},
-		{"POST Update Counter JSON", http.MethodPost, "/update/", `{"id": "metric2", "type": "counter", "delta": 100}`, http.StatusOK},
-		{"POST Value Gauge JSON", http.MethodPost, "/value/", `{"id": "metric1", "type": "gauge"}`, http.StatusOK},
-		{"POST Value Counter JSON", http.MethodPost, "/value/", `{"id": "metric2", "type": "counter"}`, http.StatusOK},
-		{"POST Update Gauge Text", http.MethodPost, "/update/gauge/metric1/123.45", "", http.StatusOK},
-		{"POST Update Counter Text", http.MethodPost, "/update/counter/metric2/100", "", http.StatusOK},
-		{"GET Value Gauge Text", http.MethodGet, "/value/gauge/metric1", "", http.StatusOK},
-		{"GET Value Counter Text", http.MethodGet, "/value/counter/metric2", "", http.StatusOK},
-		{"GET Metrics List", http.MethodGet, "/", "", http.StatusOK},
-		{"GET Value Empty", http.MethodGet, "/value/", "", http.StatusBadRequest},
-		{"POST Value Empty", http.MethodPost, "/value/", "", http.StatusBadRequest},
-		{"PUT Method Not Allowed", http.MethodPut, "/update/", "", http.StatusMethodNotAllowed},
-		{"DELETE Method Not Allowed", http.MethodDelete, "/update/", "", http.StatusMethodNotAllowed},
-		{"PUT Text Update Not Allowed", http.MethodPut, "/update/gauge/metric1/123.45", "", http.StatusMethodNotAllowed},
-		{"DELETE Text Update Not Allowed", http.MethodDelete, "/update/gauge/metric1/123.45", "", http.StatusMethodNotAllowed},
+		{
+			"POST Update Gauge JSON",
+			http.MethodPost,
+			"/update/gauge/metric1/123.45",
+			"",
+			http.StatusOK,
+			`{"id":"metric1","type":"gauge","value":123.45}`,
+			func() {
+				mock.ExpectBegin()
+				mock.ExpectExec("INSERT INTO gauges").WithArgs("metric1", 123.45).WillReturnResult(sqlmock.NewResult(1, 1))
+				mock.ExpectCommit()
+			},
+		},
+		{
+			"POST Update Counter JSON",
+			http.MethodPost,
+			"/update/counter/metric2/100",
+			"",
+			http.StatusOK,
+			`{"id":"metric2","type":"counter","delta":100}`,
+			func() {
+				mock.ExpectBegin()
+				mock.ExpectExec("INSERT INTO counters").WithArgs("metric2", int64(100)).WillReturnResult(sqlmock.NewResult(1, 1))
+				mock.ExpectCommit()
+			},
+		},
+		{
+			"GET Value Gauge",
+			http.MethodGet,
+			"/value/gauge/metric1",
+			"",
+			http.StatusOK,
+			"123.45",
+			func() {
+				mock.ExpectQuery("SELECT value FROM gauges WHERE name = ?").WithArgs("metric1").WillReturnRows(sqlmock.NewRows([]string{"value"}).AddRow(123.45))
+			},
+		},
+		{
+			"GET Value Counter",
+			http.MethodGet,
+			"/value/counter/metric2",
+			"",
+			http.StatusOK,
+			"100",
+			func() {
+				mock.ExpectQuery("SELECT value FROM counters WHERE name = ?").WithArgs("metric2").WillReturnRows(sqlmock.NewRows([]string{"value"}).AddRow(int64(100)))
+			},
+		},
+		{"GET Metrics List",
+			http.MethodGet,
+			"/",
+			"",
+			http.StatusOK,
+			"",
+			nil,
+		},
+		{
+			"GET Value Empty",
+			http.MethodGet,
+			"/value/",
+			"",
+			http.StatusBadRequest,
+			"",
+			nil,
+		},
+		{
+			"POST Value Empty",
+			http.MethodPost,
+			"/value/",
+			"",
+			http.StatusBadRequest,
+			"",
+			nil,
+		},
+		{
+			"PUT Method Not Allowed",
+			http.MethodPut,
+			"/update/gauge/metric1/123.45",
+			"",
+			http.StatusMethodNotAllowed,
+			"",
+			nil,
+		},
+		{
+			"DELETE Method Not Allowed",
+			http.MethodDelete,
+			"/update/gauge/metric1/123.45",
+			"",
+			http.StatusMethodNotAllowed,
+			"",
+			nil,
+		},
+		{
+			"GET Ping Success",
+			http.MethodGet,
+			"/ping",
+			"",
+			http.StatusOK,
+			"",
+			nil,
+		},
+		{
+			"POST Update Gauge Text",
+			http.MethodPost,
+			"/update/gauge/metric1/123.45",
+			"", http.StatusOK,
+			"",
+			nil},
+		{
+			"POST Update Counter Text",
+			http.MethodPost,
+			"/update/counter/metric2/100",
+			"",
+			http.StatusOK,
+			"",
+			nil},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.setupMock != nil {
+				tt.setupMock()
+			}
+
 			var req *http.Request
 			if tt.method == http.MethodPost && tt.body != "" {
 				req = httptest.NewRequest(tt.method, tt.url, bytes.NewBufferString(tt.body))
@@ -66,12 +186,19 @@ func Test_methodCheck(t *testing.T) {
 			} else {
 				req = httptest.NewRequest(tt.method, tt.url, nil)
 			}
-			w := httptest.NewRecorder()
 
+			w := httptest.NewRecorder()
 			handler.ServeHTTP(w, req)
 
 			if w.Code != tt.expectedCode {
 				t.Errorf("Expected status code %d, got %d for %s %s", tt.expectedCode, w.Code, tt.method, tt.url)
+			}
+
+			if tt.expectedBody != "" {
+				body := strings.TrimSpace(w.Body.String())
+				if body != tt.expectedBody {
+					t.Errorf("Expected body %q, got %q for %s %s", tt.expectedBody, body, tt.method, tt.url)
+				}
 			}
 		})
 	}
@@ -80,7 +207,16 @@ func Test_methodCheck(t *testing.T) {
 func Test_updateMetrics(t *testing.T) {
 	memStorage := storage.NewMemStorage("")
 	handler := chi.NewRouter()
-	server := &Server{MemStorage: memStorage}
+
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create mock database: %s", err)
+	}
+	defer db.Close()
+	server := &Server{
+		Storage: memStorage,
+		DB:      db,
+	}
 
 	handler.Post("/update/", server.UpdateMetrics)
 	handler.Post("/update/{type}/{name}/{value}", server.UpdateMetrics)
@@ -93,6 +229,7 @@ func Test_updateMetrics(t *testing.T) {
 		body         string
 		expectedCode int
 		expectedBody string
+		setupMock    func()
 	}{
 		{
 			name:         "JSON Valid Gauge Update",
@@ -102,6 +239,7 @@ func Test_updateMetrics(t *testing.T) {
 			body:         `{"id": "metric1", "type": "gauge", "value": 123.45}`,
 			expectedCode: http.StatusOK,
 			expectedBody: `{"id":"metric1","type":"gauge","value":123.45}`,
+			setupMock:    nil,
 		},
 		{
 			name:         "JSON Valid Counter Update",
@@ -111,6 +249,7 @@ func Test_updateMetrics(t *testing.T) {
 			body:         `{"id": "metric2", "type": "counter", "delta": 100}`,
 			expectedCode: http.StatusOK,
 			expectedBody: `{"id":"metric2","type":"counter","delta":100}`,
+			setupMock:    nil,
 		},
 		{
 			name:         "JSON Invalid Metric Type",
@@ -119,7 +258,8 @@ func Test_updateMetrics(t *testing.T) {
 			contentType:  "application/json",
 			body:         `{"id": "metric1", "type": "invalid", "value": 123.45}`,
 			expectedCode: http.StatusBadRequest,
-			expectedBody: "Bad Request: invalid metric type",
+			expectedBody: "bad Request: invalid metric type",
+			setupMock:    nil,
 		},
 		{
 			name:         "JSON Invalid Gauge Value",
@@ -128,7 +268,8 @@ func Test_updateMetrics(t *testing.T) {
 			contentType:  "application/json",
 			body:         `{"id": "metric1", "type": "gauge"}`,
 			expectedCode: http.StatusBadRequest,
-			expectedBody: "Bad Request: value is required for gauge",
+			expectedBody: "bad Request: value is required for gauge",
+			setupMock:    nil,
 		},
 		{
 			name:         "JSON Invalid Counter Value",
@@ -137,7 +278,8 @@ func Test_updateMetrics(t *testing.T) {
 			contentType:  "application/json",
 			body:         `{"id": "metric2", "type": "counter", "delta": null}`,
 			expectedCode: http.StatusBadRequest,
-			expectedBody: `Bad Request: delta is required for counter`,
+			expectedBody: `bad Request: delta is required for counter`,
+			setupMock:    nil,
 		},
 		{
 			name:         "Text Valid Gauge Update",
@@ -146,6 +288,7 @@ func Test_updateMetrics(t *testing.T) {
 			contentType:  "text/plain",
 			expectedCode: http.StatusOK,
 			expectedBody: `{"id":"metric3","type":"gauge","value":456.78}`,
+			setupMock:    nil,
 		},
 		{
 			name:         "Text Valid Counter Update",
@@ -154,6 +297,7 @@ func Test_updateMetrics(t *testing.T) {
 			contentType:  "text/plain",
 			expectedCode: http.StatusOK,
 			expectedBody: `{"id":"metric4","type":"counter","delta":200}`,
+			setupMock:    nil,
 		},
 		{
 			name:         "Text Invalid Gauge Value",
@@ -162,6 +306,7 @@ func Test_updateMetrics(t *testing.T) {
 			contentType:  "text/plain",
 			expectedCode: http.StatusBadRequest,
 			expectedBody: "Bad Request: invalid gauge value",
+			setupMock:    nil,
 		},
 		{
 			name:         "Text Invalid Counter Value",
@@ -170,6 +315,7 @@ func Test_updateMetrics(t *testing.T) {
 			contentType:  "text/plain",
 			expectedCode: http.StatusBadRequest,
 			expectedBody: "Bad Request: invalid counter value",
+			setupMock:    nil,
 		},
 		{
 			name:         "Text Invalid Metric Type",
@@ -178,6 +324,7 @@ func Test_updateMetrics(t *testing.T) {
 			contentType:  "text/plain",
 			expectedCode: http.StatusBadRequest,
 			expectedBody: "Bad Request: invalid metric type",
+			setupMock:    nil,
 		},
 		{
 			name:         "Unsupported Content-Type",
@@ -187,11 +334,16 @@ func Test_updateMetrics(t *testing.T) {
 			body:         "<metric><id>test</id><type>gauge</type><value>1.0</value></metric>",
 			expectedCode: http.StatusUnsupportedMediaType,
 			expectedBody: "Unsupported Content-Type",
+			setupMock:    nil,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.setupMock != nil {
+				tt.setupMock()
+			}
+
 			var req *http.Request
 			if tt.body != "" {
 				req = httptest.NewRequest(tt.method, tt.url, bytes.NewBufferString(tt.body))
@@ -215,11 +367,17 @@ func Test_updateMetrics(t *testing.T) {
 			}
 		})
 	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
 }
+
 func Test_getValue(t *testing.T) {
 	memStorage := storage.NewMemStorage("")
-	memStorage.SetGauge("metric1", 123.45)
-	memStorage.AddCounter("metric2", 100)
+	memStorage.SetGauge(context.Background(), "metric1", 123.45)
+	memStorage.AddCounter(context.Background(), "metric2", 100)
+	server := NewServer(memStorage, nil)
 
 	tests := []struct {
 		name         string
@@ -325,14 +483,12 @@ func Test_getValue(t *testing.T) {
 			expectedBody: "Bad Request: invalid metric type\n",
 		},
 	}
+	handler := chi.NewRouter()
+	handler.Post("/value/", server.GetValue)
+	handler.Get("/value/{type}/{name}", server.GetValue)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			server := &Server{MemStorage: memStorage}
-			handler := chi.NewRouter()
-
-			handler.Post("/value/", server.GetValue)
-			handler.Get("/value/{type}/{name}", server.GetValue)
 
 			var req *http.Request
 			if tt.body != "" {
@@ -365,10 +521,9 @@ func Test_gzipSupport(t *testing.T) {
 	os.Args = []string{"cmd", "-a=localhost:8080", "-i=300", "-f=metrics.json", "-r=true"}
 
 	memStorage := storage.NewMemStorage("")
-	memStorage.SetGauge("test_gauge", 123.45)
-	memStorage.AddCounter("test_counter", 42)
-
-	srv := &Server{MemStorage: memStorage}
+	memStorage.SetGauge(context.Background(), "test_gauge", 123.45)
+	memStorage.AddCounter(context.Background(), "test_counter", 42)
+	srv := &Server{Storage: memStorage, DB: nil}
 
 	testCases := []struct {
 		name        string

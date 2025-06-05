@@ -1,14 +1,26 @@
 package helpers
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/jackc/pgerrcode"
+	"github.com/lib/pq"
 	"go.uber.org/zap"
 
 	"github.com/alisaviation/monitoring/internal/logger"
 	"github.com/alisaviation/monitoring/internal/storage"
+)
+
+const (
+	MaxRetries   = 3
+	InitialDelay = 1 * time.Second
+	SecondDelay  = 3 * time.Second
+	ThirdDelay   = 5 * time.Second
 )
 
 func MethodCheck(methods []string) func(next http.HandlerFunc) http.HandlerFunc {
@@ -30,9 +42,9 @@ func FormatFloat(value float64) string {
 	return strings.TrimRight(strings.TrimRight(formatted, "0"), ".")
 }
 
-func CheckAndSaveMetrics(storage *storage.MemStorage, prevGauges map[string]float64, prevCounters map[string]int64) {
-	currentGauges := storage.Gauges()
-	currentCounters := storage.Counters()
+func CheckAndSaveMetrics(ctx context.Context, storage storage.Storage, prevGauges map[string]float64, prevCounters map[string]int64) {
+	currentGauges, _ := storage.Gauges(ctx)
+	currentCounters, _ := storage.Counters(ctx)
 
 	gaugeChanged := len(prevGauges) != len(currentGauges)
 	if !gaugeChanged {
@@ -59,4 +71,32 @@ func CheckAndSaveMetrics(storage *storage.MemStorage, prevGauges map[string]floa
 			logger.Log.Error("Error saving metrics", zap.Error(err))
 		}
 	}
+}
+
+func IsRetriablePostgresError(err error) bool {
+	var pqErr *pq.Error
+	if !errors.As(err, &pqErr) {
+		return false
+	}
+
+	switch pqErr.Code {
+	case pgerrcode.ConnectionException,
+		pgerrcode.ConnectionDoesNotExist,
+		pgerrcode.ConnectionFailure,
+		pgerrcode.SQLClientUnableToEstablishSQLConnection,
+		pgerrcode.SQLServerRejectedEstablishmentOfSQLConnection,
+		pgerrcode.TransactionResolutionUnknown,
+		pgerrcode.SerializationFailure:
+		return true
+	}
+	return false
+}
+
+type HTTPError struct {
+	StatusCode int
+	Message    string
+}
+
+func (e *HTTPError) Error() string {
+	return fmt.Sprintf("HTTP %d: %s", e.StatusCode, e.Message)
 }
