@@ -258,7 +258,7 @@ func Test_updateMetrics(t *testing.T) {
 			contentType:  "application/json",
 			body:         `{"id": "metric1", "type": "invalid", "value": 123.45}`,
 			expectedCode: http.StatusBadRequest,
-			expectedBody: "Bad Request: invalid metric type",
+			expectedBody: "bad Request: invalid metric type",
 			setupMock:    nil,
 		},
 		{
@@ -268,7 +268,7 @@ func Test_updateMetrics(t *testing.T) {
 			contentType:  "application/json",
 			body:         `{"id": "metric1", "type": "gauge"}`,
 			expectedCode: http.StatusBadRequest,
-			expectedBody: "Bad Request: value is required for gauge",
+			expectedBody: "bad Request: value is required for gauge",
 			setupMock:    nil,
 		},
 		{
@@ -278,7 +278,7 @@ func Test_updateMetrics(t *testing.T) {
 			contentType:  "application/json",
 			body:         `{"id": "metric2", "type": "counter", "delta": null}`,
 			expectedCode: http.StatusBadRequest,
-			expectedBody: `Bad Request: delta is required for counter`,
+			expectedBody: `bad Request: delta is required for counter`,
 			setupMock:    nil,
 		},
 		{

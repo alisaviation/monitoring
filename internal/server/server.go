@@ -324,14 +324,14 @@ func validateMetric(metric models.Metric) error {
 	switch metric.MType {
 	case models.Gauge:
 		if metric.Value == nil {
-			return errors.New("Bad Request: value is required for gauge")
+			return errors.New("bad Request: value is required for gauge")
 		}
 	case models.Counter:
 		if metric.Delta == nil {
-			return errors.New("Bad Request: delta is required for counter")
+			return errors.New("bad Request: delta is required for counter")
 		}
 	default:
-		return errors.New("Bad Request: invalid metric type")
+		return errors.New("bad Request: invalid metric type")
 	}
 	return nil
 }
