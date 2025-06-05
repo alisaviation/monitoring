@@ -35,16 +35,16 @@ func updateMetricInTx(tx *sql.Tx, metric models.Metric) error {
 	}
 }
 
-func (s *Server) execInTransactionWithRetry(ctx context.Context, fn func(tx *sql.Tx) error) error {
+func (p *Server) execInTransactionWithRetry(ctx context.Context, fn func(tx *sql.Tx) error) error {
 	retryDelays := [helpers.MaxRetries]time.Duration{helpers.InitialDelay, helpers.SecondDelay, helpers.ThirdDelay}
 	var lastErr error
 
 	for attempt := 0; attempt <= helpers.MaxRetries; attempt++ {
-		tx, err := s.DB.BeginTx(ctx, nil)
+		tx, err := p.DB.BeginTx(ctx, nil)
 		if err != nil {
 			if helpers.IsRetriablePostgresError(err) {
 				lastErr = err
-				if err := s.handleRetry(ctx, attempt, retryDelays, lastErr); err != nil {
+				if err := p.handleRetry(ctx, attempt, retryDelays, lastErr); err != nil {
 					return err
 				}
 				continue
@@ -62,7 +62,7 @@ func (s *Server) execInTransactionWithRetry(ctx context.Context, fn func(tx *sql
 
 			if helpers.IsRetriablePostgresError(err) {
 				lastErr = err
-				if err := s.handleRetry(ctx, attempt, retryDelays, lastErr); err != nil {
+				if err := p.handleRetry(ctx, attempt, retryDelays, lastErr); err != nil {
 					return err
 				}
 				continue
@@ -73,7 +73,7 @@ func (s *Server) execInTransactionWithRetry(ctx context.Context, fn func(tx *sql
 		if err := tx.Commit(); err != nil {
 			if helpers.IsRetriablePostgresError(err) {
 				lastErr = err
-				if err := s.handleRetry(ctx, attempt, retryDelays, lastErr); err != nil {
+				if err := p.handleRetry(ctx, attempt, retryDelays, lastErr); err != nil {
 					return err
 				}
 				continue
@@ -88,7 +88,7 @@ func (s *Server) execInTransactionWithRetry(ctx context.Context, fn func(tx *sql
 
 }
 
-func (s *Server) handleRetry(ctx context.Context, attempt int, retryDelays [helpers.MaxRetries]time.Duration, lastErr error) error {
+func (p *Server) handleRetry(ctx context.Context, attempt int, retryDelays [helpers.MaxRetries]time.Duration, lastErr error) error {
 	if attempt < helpers.MaxRetries {
 		select {
 		case <-ctx.Done():
