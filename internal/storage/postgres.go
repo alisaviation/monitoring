@@ -150,11 +150,12 @@ func (p *PostgresStorage) Counters(ctx context.Context) (map[string]int64, error
 func (p *PostgresStorage) Save() error {
 	return nil
 }
+
 func (p *PostgresStorage) Close() error {
 	return p.DB.Close()
 }
 
-func (s *PostgresStorage) IsUniqueViolationError(err error) bool {
+func (p *PostgresStorage) IsUniqueViolationError(err error) bool {
 	var pqErr *pq.Error
 	if errors.As(err, &pqErr) && pqErr.Code == pgerrcode.UniqueViolation {
 		return true
