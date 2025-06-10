@@ -18,18 +18,20 @@ import (
 type Sender struct {
 	serverAddress string
 	client        *resty.Client
+	key           string
 }
 
-func NewSender(serverAddress string) *Sender {
+func NewSender(serverAddress string, key string) *Sender {
 	client := resty.New()
 	client.SetHeader("Accept-Encoding", "gzip")
 	return &Sender{
 		serverAddress: serverAddress,
 		client:        client,
+		key:           key,
 	}
 }
 
-func (s *Sender) SendMetricsBatch(ctx context.Context, metrics map[string]*models.Metric) error {
+func (s *Sender) SendMetricsBatch(ctx context.Context, metrics map[string]*models.Metric, key string) error {
 	if len(metrics) == 0 {
 		logger.Log.Warn("Error, the batch is empty")
 		return ErrEmptyBatch
@@ -55,18 +57,18 @@ func (s *Sender) SendMetricsBatch(ctx context.Context, metrics map[string]*model
 		logger.Log.Error("Error marshaling JSON", zap.Error(err))
 		return fmt.Errorf("marshal failed: %w", err)
 	}
-	if err := s.sendWithRetry(ctx, "/updates/", jsonData, nil); err != nil {
+	if err := s.sendWithRetry(ctx, "/updates/", jsonData, nil, key); err != nil {
 		return fmt.Errorf("send failed: %w", err)
 	}
 	return nil
 }
 
-func (s *Sender) sendWithRetry(ctx context.Context, endpoint string, data []byte, result interface{}) error {
+func (s *Sender) sendWithRetry(ctx context.Context, endpoint string, data []byte, result interface{}, key string) error {
 	retryDelays := [helpers.MaxRetries]time.Duration{helpers.InitialDelay, helpers.SecondDelay, helpers.ThirdDelay}
 	var lastErr error
 
 	for attempt := 0; attempt <= helpers.MaxRetries; attempt++ {
-		req, err := s.prepareRequest(ctx, endpoint, data)
+		req, err := s.prepareRequest(ctx, endpoint, data, key)
 		if err != nil {
 			logger.Log.Error("Error preparing request", zap.Error(err))
 			return err

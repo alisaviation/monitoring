@@ -69,16 +69,21 @@ var (
 	ErrEmptyBatch         = errors.New("metrics batch is empty")
 )
 
-func (s *Sender) prepareRequest(ctx context.Context, endpoint string, data []byte) (*resty.Request, error) {
+func (s *Sender) prepareRequest(ctx context.Context, endpoint string, data []byte, key string) (*resty.Request, error) {
 	compressedData, err := s.compressData(data)
 	if err != nil {
 		logger.Log.Error("Error compressing data", zap.Error(err))
 		return nil, err
 	}
-
-	return s.client.R().
+	req := s.client.R().
 		SetContext(ctx).
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Content-Encoding", "gzip").
-		SetBody(compressedData), nil
+		SetBody(compressedData)
+	if s.key != "" {
+		hash := helpers.CalculateHash(data, key)
+		req.SetHeader("HashSHA256", hash)
+	}
+
+	return req, nil
 }

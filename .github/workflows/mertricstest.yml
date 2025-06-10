@@ -275,7 +275,7 @@ jobs:
           metricstest -test.v -test.run='^TestIteration10[AB]$' \
             -agent-binary-path=cmd/agent/agent \
             -binary-path=cmd/server/server \
-            -database-dsn='postgres://postgres:postgres@postgres:5432/praktikum?sslmode=disable' \
+            -database-dsn='postgres://postgres:postgres@localhost:5432/praktikum?sslmode=disable' \
             -server-port=$SERVER_PORT \
             -source-path=.
 
@@ -293,7 +293,7 @@ jobs:
           metricstest -test.v -test.run=^TestIteration11$ \
             -agent-binary-path=cmd/agent/agent \
             -binary-path=cmd/server/server \
-            -database-dsn='postgres://postgres:postgres@postgres:5432/praktikum?sslmode=disable' \
+            -database-dsn='postgres://postgres:postgres@localhost:5432/praktikum?sslmode=disable' \
             -server-port=$SERVER_PORT \
             -source-path=.
 
@@ -310,7 +310,7 @@ jobs:
           metricstest -test.v -test.run=^TestIteration12$ \
             -agent-binary-path=cmd/agent/agent \
             -binary-path=cmd/server/server \
-            -database-dsn='postgres://postgres:postgres@postgres:5432/praktikum?sslmode=disable' \
+            -database-dsn='postgres://postgres:postgres@localhost:5432/praktikum?sslmode=disable' \
             -server-port=$SERVER_PORT \
             -source-path=.
 
@@ -326,7 +326,7 @@ jobs:
           metricstest -test.v -test.run=^TestIteration13$ \
             -agent-binary-path=cmd/agent/agent \
             -binary-path=cmd/server/server \
-            -database-dsn='postgres://postgres:postgres@postgres:5432/praktikum?sslmode=disable' \
+            -database-dsn='postgres://postgres:postgres@localhost:5432/praktikum?sslmode=disable' \
             -server-port=$SERVER_PORT \
             -source-path=.
 
@@ -341,7 +341,7 @@ jobs:
           metricstest -test.v -test.run=^TestIteration14$ \
             -agent-binary-path=cmd/agent/agent \
             -binary-path=cmd/server/server \
-            -database-dsn='postgres://postgres:postgres@postgres:5432/praktikum?sslmode=disable' \
+            -database-dsn='postgres://postgres:postgres@localhost:5432/praktikum?sslmode=disable' \
             -key="${TEMP_FILE}" \
             -server-port=$SERVER_PORT \
             -source-path=.
