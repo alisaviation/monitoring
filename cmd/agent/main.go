@@ -37,7 +37,7 @@ func main() {
 	}()
 
 	collectorInstance := collector.NewCollector()
-	senderInstance := sender.NewSender(conf.ServerAddress)
+	senderInstance := sender.NewSender(conf.ServerAddress, conf.Key)
 	metricsBuffer := make(map[string]*models.Metric)
 
 	pollTicker := time.NewTicker(conf.PollInterval)
@@ -50,7 +50,7 @@ func main() {
 		case <-ctx.Done():
 			logger.Log.Info("Shutting down agent...")
 			if len(metricsBuffer) > 0 {
-				if err := senderInstance.SendMetricsBatch(ctx, metricsBuffer); err != nil {
+				if err := senderInstance.SendMetricsBatch(ctx, metricsBuffer, conf.Key); err != nil {
 					logger.Log.Error("Failed to send final metrics batch", zap.Error(err))
 				}
 			}
@@ -63,7 +63,7 @@ func main() {
 
 		case <-reportTicker.C:
 			if len(metricsBuffer) > 0 {
-				if err := senderInstance.SendMetricsBatch(ctx, metricsBuffer); err != nil {
+				if err := senderInstance.SendMetricsBatch(ctx, metricsBuffer, conf.Key); err != nil {
 					logger.Log.Error("Failed to send metrics batch", zap.Error(err))
 					continue
 				}

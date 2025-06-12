@@ -2,6 +2,9 @@ package helpers
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
@@ -99,4 +102,9 @@ type HTTPError struct {
 
 func (e *HTTPError) Error() string {
 	return fmt.Sprintf("HTTP %d: %s", e.StatusCode, e.Message)
+}
+func CalculateHash(data []byte, key string) string {
+	h := hmac.New(sha256.New, []byte(key))
+	h.Write(data)
+	return hex.EncodeToString(h.Sum(nil))
 }

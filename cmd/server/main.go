@@ -87,7 +87,7 @@ func main() {
 
 	srv := &http.Server{Addr: conf.ServerAddress}
 	go func() {
-		if err := run(storageInstance, srv, conf.StoreInterval, db); err != nil && err != http.ErrServerClosed {
+		if err := run(storageInstance, srv, conf.StoreInterval, db, conf.Key); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Error running server: %v", err)
 		}
 	}()
@@ -119,19 +119,21 @@ func main() {
 	logger.Log.Info("Server stopped")
 }
 
-func run(storageInstance storage.Storage, srv *http.Server, storeInterval time.Duration, db *sql.DB) error {
+func run(storageInstance storage.Storage, srv *http.Server, storeInterval time.Duration, db *sql.DB, key string) error {
 	srvr := server.NewServer(storageInstance, db)
 
 	r := chi.NewRouter()
 	r.Use(logger.RequestResponseLogger)
 	r.Use(middleware.GzipMiddleware)
+	r.Use(middleware.KeyContextMiddleware(key))
+	r.Use(middleware.HashCheckMiddleware(key))
 	r.Use(middleware.SyncSaveMiddleware(storeInterval, storageInstance))
 
 	r.Post("/update/{type}/{name}/{value}", helpers.MethodCheck([]string{http.MethodPost})(srvr.UpdateMetrics))
 	r.Get("/value/{type}/{name}", helpers.MethodCheck([]string{http.MethodGet})(srvr.GetValue))
 	r.Post("/update/", helpers.MethodCheck([]string{http.MethodPost})(srvr.UpdateMetrics))
-	r.Get("/value/", helpers.MethodCheck([]string{http.MethodGet})(srvr.GetValue))
 	r.Post("/value/", helpers.MethodCheck([]string{http.MethodPost})(srvr.GetValue))
+	r.Get("/value/", helpers.MethodCheck([]string{http.MethodGet})(srvr.GetValue))
 	r.Get("/", helpers.MethodCheck([]string{http.MethodGet})(srvr.GetMetricsList))
 	r.Get("/ping", helpers.MethodCheck([]string{http.MethodGet})(srvr.PingHandler))
 	r.Post("/updates/", helpers.MethodCheck([]string{http.MethodPost})(srvr.UpdateBatchMetrics))

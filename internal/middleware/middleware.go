@@ -1,7 +1,9 @@
 package middleware
 
 import (
+	"bytes"
 	"compress/gzip"
+	"context"
 	"io"
 	"log"
 	"net/http"
@@ -120,4 +122,59 @@ func (w *responseWriterWrapper) Write(b []byte) (int, error) {
 	}
 	w.mu.Unlock()
 	return w.ResponseWriter.Write(b)
+}
+
+func HashCheckMiddleware(key string) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if key == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			hashHeader := r.Header.Get("HashSHA256")
+			if hashHeader == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				http.Error(w, "Bad Request: cannot read body", http.StatusBadRequest)
+				return
+			}
+			r.Body = io.NopCloser(bytes.NewBuffer(body))
+
+			computedHash := helpers.CalculateHash(body, key)
+			if computedHash != hashHeader {
+				http.Error(w, "Bad Request: invalid hash", http.StatusBadRequest)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+type contextKey string
+
+const secretKey contextKey = "secretKey"
+
+func KeyContextMiddleware(key string) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if key != "" {
+				ctx := context.WithValue(r.Context(), secretKey, key)
+				r = r.WithContext(ctx)
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func GetKeyFromContext(ctx context.Context) string {
+	if val, ok := ctx.Value(secretKey).(string); ok {
+		return val
+	}
+	return ""
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -13,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/alisaviation/monitoring/internal/helpers"
+	"github.com/alisaviation/monitoring/internal/middleware"
 	"github.com/alisaviation/monitoring/internal/models"
 	"github.com/alisaviation/monitoring/internal/storage"
 )
@@ -41,17 +41,18 @@ func (p *Server) PingHandler(w http.ResponseWriter, r *http.Request) {
 
 func (p *Server) UpdateMetrics(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
+	key := middleware.GetKeyFromContext(r.Context())
 	switch {
 	case strings.Contains(contentType, "application/json"):
-		p.UpdateJSONMetrics(r.Context(), w, r)
+		p.UpdateJSONMetrics(r.Context(), w, r, key)
 	case strings.Contains(contentType, "text/plain"), contentType == "":
-		p.UpdateTextMetrics(w, r)
+		p.UpdateTextMetrics(w, r, key)
 	default:
 		http.Error(w, "Unsupported Content-Type", http.StatusUnsupportedMediaType)
 	}
 }
 
-func (p *Server) UpdateJSONMetrics(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+func (p *Server) UpdateJSONMetrics(ctx context.Context, w http.ResponseWriter, r *http.Request, key string) {
 	var metrics models.Metric
 	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
 		http.Error(w, "Bad Request: invalid JSON", http.StatusBadRequest)
@@ -65,10 +66,10 @@ func (p *Server) UpdateJSONMetrics(ctx context.Context, w http.ResponseWriter, r
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	p.respondWithMetric(ctx, w, metrics)
+	p.respondWithMetric(ctx, w, metrics, key)
 }
 
-func (p *Server) UpdateTextMetrics(w http.ResponseWriter, r *http.Request) {
+func (p *Server) UpdateTextMetrics(w http.ResponseWriter, r *http.Request, key string) {
 	metric := models.Metric{
 		ID:    chi.URLParam(r, "name"),
 		MType: chi.URLParam(r, "type"),
@@ -100,13 +101,13 @@ func (p *Server) UpdateTextMetrics(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	p.respondWithMetric(r.Context(), w, metric)
+	p.respondWithMetric(r.Context(), w, metric, key)
 }
 
 func (p *Server) GetValue(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
 	var response interface{}
+	key := middleware.GetKeyFromContext(r.Context())
 
 	switch {
 	case strings.Contains(contentType, "application/json"):
@@ -119,6 +120,12 @@ func (p *Server) GetValue(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
+		}
+		if r.Method == http.MethodPost {
+			p.setResponseHash(w, jsonData, key)
+		}
+		if r.Method == http.MethodGet {
+			p.setResponseHash(w, jsonData, key)
 		}
 		w.Write(jsonData)
 		return
@@ -142,6 +149,13 @@ func (p *Server) GetValue(w http.ResponseWriter, r *http.Request) {
 	if response == nil {
 		http.Error(w, "Not Found in GetValue", http.StatusNotFound)
 		return
+	}
+	if r.Method == http.MethodPost {
+		responseStr := fmt.Sprint(response)
+		p.setResponseHash(w, []byte(responseStr), key)
+	}
+	if r.Method == http.MethodGet {
+		p.setResponseHash(w, []byte(fmt.Sprint(response)), key)
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
@@ -206,6 +220,7 @@ func (p *Server) GetTextValue(ctx context.Context, w http.ResponseWriter, r *htt
 
 func (p *Server) UpdateBatchMetrics(w http.ResponseWriter, r *http.Request) {
 	var metrics []models.Metric
+	key := middleware.GetKeyFromContext(r.Context())
 	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
 		http.Error(w, "Bad Request: invalid JSON", http.StatusBadRequest)
 		return
@@ -253,11 +268,15 @@ func (p *Server) UpdateBatchMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(updatedMetrics); err != nil {
+	jsonData, err := json.Marshal(updatedMetrics)
+	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
+
+	p.setResponseHash(w, jsonData, key)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(jsonData)
 }
 
 func (p *Server) GetMetricsList(w http.ResponseWriter, r *http.Request) {
@@ -285,82 +304,4 @@ func (p *Server) GetMetricsList(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(response.String()))
 
-}
-
-func (p *Server) respondWithMetric(ctx context.Context, w http.ResponseWriter, metric models.Metric) {
-	switch metric.MType {
-	case models.Gauge:
-		value, err := p.Storage.GetGauge(ctx, metric.ID)
-		if err != nil {
-			metric.Value = value
-		}
-	case models.Counter:
-		delta, err := p.Storage.GetCounter(ctx, metric.ID)
-		if err != nil {
-			metric.Delta = delta
-		}
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(metric); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-func (p *Server) updateMetric(ctx context.Context, metric models.Metric) error {
-	switch metric.MType {
-	case models.Gauge:
-		return p.Storage.SetGauge(ctx, metric.ID, *metric.Value)
-	case models.Counter:
-		return p.Storage.AddCounter(ctx, metric.ID, *metric.Delta)
-	default:
-		return &helpers.HTTPError{
-			StatusCode: http.StatusBadRequest,
-			Message:    "Bad Request: invalid metric type",
-		}
-	}
-}
-
-func validateMetric(metric models.Metric) error {
-	switch metric.MType {
-	case models.Gauge:
-		if metric.Value == nil {
-			return errors.New("bad Request: value is required for gauge")
-		}
-	case models.Counter:
-		if metric.Delta == nil {
-			return errors.New("bad Request: delta is required for counter")
-		}
-	default:
-		return errors.New("bad Request: invalid metric type")
-	}
-	return nil
-}
-
-func (p *Server) getUpdatedMetrics(ctx context.Context, metrics []models.Metric) ([]models.Metric, error) {
-	var updatedMetrics []models.Metric
-	for _, metric := range metrics {
-		var updatedMetric models.Metric
-		updatedMetric.ID = metric.ID
-		updatedMetric.MType = metric.MType
-
-		switch metric.MType {
-		case models.Gauge:
-			value, err := p.Storage.GetGauge(ctx, metric.ID)
-			if err != nil {
-				return nil, err
-			}
-			updatedMetric.Value = value
-		case models.Counter:
-			delta, err := p.Storage.GetCounter(ctx, metric.ID)
-			if err != nil {
-				return nil, err
-			}
-			updatedMetric.Delta = delta
-		default:
-			return nil, fmt.Errorf("invalid metric type")
-		}
-
-		updatedMetrics = append(updatedMetrics, updatedMetric)
-	}
-	return updatedMetrics, nil
 }
