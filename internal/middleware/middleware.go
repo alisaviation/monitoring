@@ -156,14 +156,25 @@ func HashCheckMiddleware(key string) func(next http.Handler) http.Handler {
 	}
 }
 
+type contextKey string
+
+const secretKey contextKey = "secretKey"
+
 func KeyContextMiddleware(key string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if key != "" {
-				ctx := context.WithValue(r.Context(), key, key)
+				ctx := context.WithValue(r.Context(), secretKey, key)
 				r = r.WithContext(ctx)
 			}
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func GetKeyFromContext(ctx context.Context) string {
+	if val, ok := ctx.Value(secretKey).(string); ok {
+		return val
+	}
+	return ""
 }

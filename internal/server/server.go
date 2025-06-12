@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/alisaviation/monitoring/internal/helpers"
+	"github.com/alisaviation/monitoring/internal/middleware"
 	"github.com/alisaviation/monitoring/internal/models"
 	"github.com/alisaviation/monitoring/internal/storage"
 )
@@ -40,17 +41,18 @@ func (p *Server) PingHandler(w http.ResponseWriter, r *http.Request) {
 
 func (p *Server) UpdateMetrics(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
+	key := middleware.GetKeyFromContext(r.Context())
 	switch {
 	case strings.Contains(contentType, "application/json"):
-		p.UpdateJSONMetrics(r.Context(), w, r)
+		p.UpdateJSONMetrics(r.Context(), w, r, key)
 	case strings.Contains(contentType, "text/plain"), contentType == "":
-		p.UpdateTextMetrics(w, r)
+		p.UpdateTextMetrics(w, r, key)
 	default:
 		http.Error(w, "Unsupported Content-Type", http.StatusUnsupportedMediaType)
 	}
 }
 
-func (p *Server) UpdateJSONMetrics(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+func (p *Server) UpdateJSONMetrics(ctx context.Context, w http.ResponseWriter, r *http.Request, key string) {
 	var metrics models.Metric
 	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
 		http.Error(w, "Bad Request: invalid JSON", http.StatusBadRequest)
@@ -64,10 +66,10 @@ func (p *Server) UpdateJSONMetrics(ctx context.Context, w http.ResponseWriter, r
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	p.respondWithMetric(ctx, w, metrics, p.getKeyFromContext(r.Context()))
+	p.respondWithMetric(ctx, w, metrics, key)
 }
 
-func (p *Server) UpdateTextMetrics(w http.ResponseWriter, r *http.Request) {
+func (p *Server) UpdateTextMetrics(w http.ResponseWriter, r *http.Request, key string) {
 	metric := models.Metric{
 		ID:    chi.URLParam(r, "name"),
 		MType: chi.URLParam(r, "type"),
@@ -99,13 +101,13 @@ func (p *Server) UpdateTextMetrics(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	p.respondWithMetric(r.Context(), w, metric, p.getKeyFromContext(r.Context()))
+	p.respondWithMetric(r.Context(), w, metric, key)
 }
 
 func (p *Server) GetValue(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
 	var response interface{}
+	key := middleware.GetKeyFromContext(r.Context())
 
 	switch {
 	case strings.Contains(contentType, "application/json"):
@@ -120,10 +122,9 @@ func (p *Server) GetValue(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if r.Method == http.MethodPost {
-			p.setResponseHash(w, jsonData, p.getKeyFromContext(r.Context()))
+			p.setResponseHash(w, jsonData, key)
 		}
 		if r.Method == http.MethodGet {
-			key := p.getKeyFromContext(r.Context())
 			p.setResponseHash(w, jsonData, key)
 		}
 		w.Write(jsonData)
@@ -151,10 +152,9 @@ func (p *Server) GetValue(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method == http.MethodPost {
 		responseStr := fmt.Sprint(response)
-		p.setResponseHash(w, []byte(responseStr), p.getKeyFromContext(r.Context()))
+		p.setResponseHash(w, []byte(responseStr), key)
 	}
 	if r.Method == http.MethodGet {
-		key := p.getKeyFromContext(r.Context())
 		p.setResponseHash(w, []byte(fmt.Sprint(response)), key)
 	}
 
@@ -220,6 +220,7 @@ func (p *Server) GetTextValue(ctx context.Context, w http.ResponseWriter, r *htt
 
 func (p *Server) UpdateBatchMetrics(w http.ResponseWriter, r *http.Request) {
 	var metrics []models.Metric
+	key := middleware.GetKeyFromContext(r.Context())
 	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
 		http.Error(w, "Bad Request: invalid JSON", http.StatusBadRequest)
 		return
@@ -273,7 +274,7 @@ func (p *Server) UpdateBatchMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p.setResponseHash(w, jsonData, p.getKeyFromContext(r.Context()))
+	p.setResponseHash(w, jsonData, key)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(jsonData)
 }
