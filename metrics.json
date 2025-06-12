@@ -1,8 +1,0 @@
-{
-    "gauges": {
-        "testGauge": 100
-    },
-    "counters": {
-        "testCounter": 100
-    }
-}
