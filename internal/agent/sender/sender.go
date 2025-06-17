@@ -59,18 +59,3 @@ func (s *Sender) SendMetricsBatch(ctx context.Context, metrics map[string]*model
 	}
 	return nil
 }
-
-func (s *Sender) SendMetrics(ctx context.Context, metrics map[string]*models.Metric, key string, pool *WorkerPool) {
-	sendData := make(map[string]*models.Metric, len(metrics))
-	for k, v := range metrics {
-		sendData[k] = v
-	}
-
-	pool.Submit(func() {
-		if err := s.SendMetricsBatch(ctx, sendData, key); err != nil {
-			logger.Log.Error("Failed to send metrics batch", zap.Error(err))
-		} else {
-			logger.Log.Debug("Metrics batch sent", zap.Int("count", len(sendData)))
-		}
-	})
-}

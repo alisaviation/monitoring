@@ -33,8 +33,8 @@ func Test_methodCheck(t *testing.T) {
 	defer db.Close()
 
 	server := &Server{
-		Storage: memStorage,
-		DB:      db,
+		storage: memStorage,
+		db:      db,
 	}
 
 	handler.Post("/update/{type}/{name}/{value}", helpers.MethodCheck([]string{http.MethodPost})(server.UpdateMetrics))
@@ -214,8 +214,8 @@ func Test_updateMetrics(t *testing.T) {
 	}
 	defer db.Close()
 	server := &Server{
-		Storage: memStorage,
-		DB:      db,
+		storage: memStorage,
+		db:      db,
 	}
 
 	handler.Post("/update/", server.UpdateMetrics)
@@ -523,7 +523,7 @@ func Test_gzipSupport(t *testing.T) {
 	memStorage := storage.NewMemStorage("")
 	memStorage.SetGauge(context.Background(), "test_gauge", 123.45)
 	memStorage.AddCounter(context.Background(), "test_counter", 42)
-	srv := &Server{Storage: memStorage, DB: nil}
+	srv := &Server{storage: memStorage, db: nil}
 
 	testCases := []struct {
 		name        string
