@@ -104,10 +104,3 @@ func (p *Server) setResponseHash(w http.ResponseWriter, data []byte, key string)
 	hash := helpers.CalculateHash(data, key)
 	w.Header().Set("HashSHA256", hash)
 }
-
-func (p *Server) getKeyFromContext(ctx context.Context) string {
-	if val, ok := ctx.Value("key").(string); ok {
-		return val
-	}
-	return ""
-}

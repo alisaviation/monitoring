@@ -4,13 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"time"
 
 	"github.com/go-resty/resty/v2"
 	"go.uber.org/zap"
 
-	"github.com/alisaviation/monitoring/internal/helpers"
 	"github.com/alisaviation/monitoring/internal/logger"
 	"github.com/alisaviation/monitoring/internal/models"
 )
@@ -63,68 +60,17 @@ func (s *Sender) SendMetricsBatch(ctx context.Context, metrics map[string]*model
 	return nil
 }
 
-func (s *Sender) sendWithRetry(ctx context.Context, endpoint string, data []byte, result interface{}, key string) error {
-	retryDelays := [helpers.MaxRetries]time.Duration{helpers.InitialDelay, helpers.SecondDelay, helpers.ThirdDelay}
-	var lastErr error
-
-	for attempt := 0; attempt <= helpers.MaxRetries; attempt++ {
-		req, err := s.prepareRequest(ctx, endpoint, data, key)
-		if err != nil {
-			logger.Log.Error("Error preparing request", zap.Error(err))
-			return err
-		}
-
-		if result != nil {
-			req.SetResult(result)
-		}
-
-		resp, err := req.Post("http://" + s.serverAddress + endpoint)
-		if resp != nil {
-			defer func() {
-				if resp.RawResponse != nil && resp.RawResponse.Body != nil {
-					resp.RawResponse.Body.Close()
-				}
-			}()
-
-			if resp.StatusCode() == http.StatusOK {
-				return nil
-			}
-
-			if !s.isRetriableError(err) {
-				logger.Log.Error("Non-retriable error response",
-					zap.String("status", resp.Status()),
-					zap.Int("code", resp.StatusCode()))
-				return fmt.Errorf("server returned status %d", resp.StatusCode())
-			}
-
-			lastErr = fmt.Errorf("HTTP status %d", resp.StatusCode())
-			logger.Log.Warn("Retriable error response",
-				zap.Int("attempt", attempt+1),
-				zap.String("status", resp.Status()),
-				zap.Error(lastErr))
-		}
-
-		if err != nil {
-			if !s.isRetriableError(err) {
-				logger.Log.Error("Non-retriable request error", zap.Error(err))
-				return fmt.Errorf("%w: %v", ErrNonRetriable, err)
-			}
-			lastErr = err
-			logger.Log.Warn("Retriable request error",
-				zap.Int("attempt", attempt+1),
-				zap.Error(err))
-		}
-
-		if attempt < helpers.MaxRetries {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(retryDelays[attempt]):
-				continue
-			}
-		}
+func (s *Sender) SendMetrics(ctx context.Context, metrics map[string]*models.Metric, key string, pool *WorkerPool) {
+	sendData := make(map[string]*models.Metric, len(metrics))
+	for k, v := range metrics {
+		sendData[k] = v
 	}
 
-	logger.Log.Error("Max retries exceeded", zap.Error(lastErr))
-	return fmt.Errorf("%w: last error: %v", ErrMaxRetriesExceeded, lastErr)
+	pool.Submit(func() {
+		if err := s.SendMetricsBatch(ctx, sendData, key); err != nil {
+			logger.Log.Error("Failed to send metrics batch", zap.Error(err))
+		} else {
+			logger.Log.Debug("Metrics batch sent", zap.Int("count", len(sendData)))
+		}
+	})
 }

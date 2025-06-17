@@ -121,13 +121,10 @@ func (p *Server) GetValue(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if r.Method == http.MethodPost {
-			p.setResponseHash(w, jsonData, key)
-		}
-		if r.Method == http.MethodGet {
-			p.setResponseHash(w, jsonData, key)
-		}
+
+		p.setResponseHash(w, jsonData, key)
 		w.Write(jsonData)
+
 		return
 	default:
 		metrics := p.GetTextValue(r.Context(), w, r)
@@ -150,13 +147,7 @@ func (p *Server) GetValue(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Not Found in GetValue", http.StatusNotFound)
 		return
 	}
-	if r.Method == http.MethodPost {
-		responseStr := fmt.Sprint(response)
-		p.setResponseHash(w, []byte(responseStr), key)
-	}
-	if r.Method == http.MethodGet {
-		p.setResponseHash(w, []byte(fmt.Sprint(response)), key)
-	}
+	p.setResponseHash(w, []byte(fmt.Sprint(response)), key)
 
 	w.Header().Set("Content-Type", "text/plain")
 	fmt.Fprint(w, response)
@@ -221,6 +212,7 @@ func (p *Server) GetTextValue(ctx context.Context, w http.ResponseWriter, r *htt
 func (p *Server) UpdateBatchMetrics(w http.ResponseWriter, r *http.Request) {
 	var metrics []models.Metric
 	key := middleware.GetKeyFromContext(r.Context())
+
 	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
 		http.Error(w, "Bad Request: invalid JSON", http.StatusBadRequest)
 		return
@@ -254,6 +246,7 @@ func (p *Server) UpdateBatchMetrics(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+
 	if p.DB == nil {
 		for _, metric := range metrics {
 			if err := p.updateMetric(r.Context(), metric); err != nil {
@@ -262,6 +255,7 @@ func (p *Server) UpdateBatchMetrics(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+
 	updatedMetrics, err := p.getUpdatedMetrics(r.Context(), metrics)
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)

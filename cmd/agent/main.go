@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -36,40 +37,102 @@ func main() {
 		cancel()
 	}()
 
+	logger.Log.Info("Rate limit configuration", zap.Int("value", conf.RateLimit))
+
 	collectorInstance := collector.NewCollector()
 	senderInstance := sender.NewSender(conf.ServerAddress, conf.Key)
+	workerPool := sender.NewWorkerPool(conf.RateLimit)
+	bufferSize := conf.RateLimit * 10
+	metricsChan := make(chan map[string]*models.Metric, bufferSize)
+
+	var bufferMutex sync.Mutex
 	metricsBuffer := make(map[string]*models.Metric)
 
-	pollTicker := time.NewTicker(conf.PollInterval)
-	reportTicker := time.NewTicker(conf.ReportInterval)
-	defer pollTicker.Stop()
-	defer reportTicker.Stop()
+	go func() {
+		logger.Log.Info("Goroutine started: metrics collection")
 
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Log.Info("Shutting down agent...")
-			if len(metricsBuffer) > 0 {
-				if err := senderInstance.SendMetricsBatch(ctx, metricsBuffer, conf.Key); err != nil {
-					logger.Log.Error("Failed to send final metrics batch", zap.Error(err))
+		pollTicker := time.NewTicker(conf.PollInterval)
+		defer pollTicker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-pollTicker.C:
+				metrics := collectorInstance.CollectMetrics()
+				select {
+				case metricsChan <- metrics:
+					logger.Log.Info("Collected runtime metrics", zap.Int("count", len(metrics)))
+				default:
+					logger.Log.Info("Metrics channel is full, dropping metrics batch")
 				}
-			}
-			return
-
-		case <-pollTicker.C:
-			metrics := collectorInstance.CollectMetrics()
-			collector.UpdateMetricsBuffer(metricsBuffer, metrics)
-			logger.Log.Debug("Collected metrics", zap.Int("count", len(metrics)))
-
-		case <-reportTicker.C:
-			if len(metricsBuffer) > 0 {
-				if err := senderInstance.SendMetricsBatch(ctx, metricsBuffer, conf.Key); err != nil {
-					logger.Log.Error("Failed to send metrics batch", zap.Error(err))
-					continue
-				}
-				logger.Log.Debug("Metrics batch sent", zap.Int("count", len(metricsBuffer)))
-				metricsBuffer = make(map[string]*models.Metric)
 			}
 		}
-	}
+	}()
+
+	go func() {
+		logger.Log.Info("Goroutine started: gopsutil metrics collection")
+		pollTicker := time.NewTicker(conf.PollInterval)
+		defer pollTicker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-pollTicker.C:
+				metrics := collectorInstance.СollectGopsutilMetrics()
+				select {
+				case metricsChan <- metrics:
+					logger.Log.Info("Collected gopsutil metrics", zap.Int("count", len(metrics)))
+				default:
+					logger.Log.Info("Metrics channel is full, dropping metrics batch")
+				}
+			}
+		}
+	}()
+
+	go func() {
+		logger.Log.Info("Goroutine started: Update metrics")
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case metrics := <-metricsChan:
+				bufferMutex.Lock()
+				collector.UpdateMetricsBuffer(metricsBuffer, metrics)
+				bufferMutex.Unlock()
+			}
+		}
+	}()
+
+	go func() {
+		logger.Log.Debug("Goroutine started: Sending metrics")
+		reportTicker := time.NewTicker(conf.ReportInterval)
+		defer reportTicker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				bufferMutex.Lock()
+				if len(metricsBuffer) > 0 {
+					senderInstance.SendMetrics(ctx, metricsBuffer, conf.Key, workerPool)
+					metricsBuffer = make(map[string]*models.Metric)
+				}
+				bufferMutex.Unlock()
+				return
+
+			case <-reportTicker.C:
+
+				bufferMutex.Lock()
+				if len(metricsBuffer) > 0 {
+					senderInstance.SendMetrics(ctx, metricsBuffer, conf.Key, workerPool)
+					metricsBuffer = make(map[string]*models.Metric)
+				}
+				bufferMutex.Unlock()
+			}
+		}
+	}()
+
+	<-ctx.Done()
+	workerPool.Wait()
+	logger.Log.Info("Shutting down agent...")
 }
