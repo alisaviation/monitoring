@@ -3,6 +3,10 @@ package collector
 import (
 	"math/rand"
 	"runtime"
+	"strconv"
+
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/mem"
 
 	"github.com/alisaviation/monitoring/internal/models"
 )
@@ -62,6 +66,18 @@ func (c *Collector) initMetrics() {
 
 	c.metrics[models.RandomValue] = &models.Metric{ID: models.RandomValue, Value: new(float64), MType: models.Gauge}
 	c.metrics[models.PollCount] = &models.Metric{ID: models.PollCount, Delta: new(int64), MType: models.Counter}
+
+	c.initGopsutilMetrics()
+}
+
+func (c *Collector) initGopsutilMetrics() {
+	c.metrics[models.TotalMemory] = &models.Metric{ID: models.TotalMemory, Value: new(float64), MType: models.Gauge}
+	c.metrics[models.FreeMemory] = &models.Metric{ID: models.FreeMemory, Value: new(float64), MType: models.Gauge}
+	numCPU := runtime.NumCPU()
+	for i := 0; i < numCPU; i++ {
+		name := models.CPUutilization + strconv.Itoa(i+1)
+		c.metrics[name] = &models.Metric{ID: name, Value: new(float64), MType: models.Gauge}
+	}
 }
 
 func (c *Collector) CollectMetrics() map[string]*models.Metric {
@@ -120,4 +136,20 @@ func UpdateMetricsBuffer(metricsBuffer map[string]*models.Metric, metrics map[st
 			metricsBuffer[name] = metric
 		}
 	}
+}
+
+func (c *Collector) СollectGopsutilMetrics() map[string]*models.Metric {
+	if memStats, err := mem.VirtualMemory(); err == nil {
+		*c.metrics[models.TotalMemory].Value = float64(memStats.Total)
+		*c.metrics[models.FreeMemory].Value = float64(memStats.Free)
+	}
+	if cpuStats, err := cpu.Percent(0, true); err == nil {
+		for i, percent := range cpuStats {
+			name := models.CPUutilization + strconv.Itoa(i+1)
+			if metric, exists := c.metrics[name]; exists {
+				*metric.Value = percent
+			}
+		}
+	}
+	return c.metrics
 }

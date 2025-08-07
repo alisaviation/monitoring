@@ -35,16 +35,16 @@ func updateMetricInTx(tx *sql.Tx, metric models.Metric) error {
 	}
 }
 
-func (p *Server) execInTransactionWithRetry(ctx context.Context, fn func(tx *sql.Tx) error) error {
+func (s *Server) execInTransactionWithRetry(ctx context.Context, fn func(tx *sql.Tx) error) error {
 	retryDelays := [helpers.MaxRetries]time.Duration{helpers.InitialDelay, helpers.SecondDelay, helpers.ThirdDelay}
 	var lastErr error
 
 	for attempt := 0; attempt <= helpers.MaxRetries; attempt++ {
-		tx, err := p.DB.BeginTx(ctx, nil)
+		tx, err := s.db.BeginTx(ctx, nil)
 		if err != nil {
 			if helpers.IsRetriablePostgresError(err) {
 				lastErr = err
-				if err := p.handleRetry(ctx, attempt, retryDelays, lastErr); err != nil {
+				if err := s.handleRetry(ctx, attempt, retryDelays, lastErr); err != nil {
 					return err
 				}
 				continue
@@ -62,7 +62,7 @@ func (p *Server) execInTransactionWithRetry(ctx context.Context, fn func(tx *sql
 
 			if helpers.IsRetriablePostgresError(err) {
 				lastErr = err
-				if err := p.handleRetry(ctx, attempt, retryDelays, lastErr); err != nil {
+				if err := s.handleRetry(ctx, attempt, retryDelays, lastErr); err != nil {
 					return err
 				}
 				continue
@@ -73,7 +73,7 @@ func (p *Server) execInTransactionWithRetry(ctx context.Context, fn func(tx *sql
 		if err := tx.Commit(); err != nil {
 			if helpers.IsRetriablePostgresError(err) {
 				lastErr = err
-				if err := p.handleRetry(ctx, attempt, retryDelays, lastErr); err != nil {
+				if err := s.handleRetry(ctx, attempt, retryDelays, lastErr); err != nil {
 					return err
 				}
 				continue
@@ -86,16 +86,4 @@ func (p *Server) execInTransactionWithRetry(ctx context.Context, fn func(tx *sql
 
 	return fmt.Errorf("after %d attempts: %w", helpers.MaxRetries, lastErr)
 
-}
-
-func (p *Server) handleRetry(ctx context.Context, attempt int, retryDelays [helpers.MaxRetries]time.Duration, lastErr error) error {
-	if attempt < helpers.MaxRetries {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(retryDelays[attempt]):
-			return nil
-		}
-	}
-	return fmt.Errorf("after %d attempts: %w", helpers.MaxRetries, lastErr)
 }
