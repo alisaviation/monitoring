@@ -5,7 +5,27 @@ meta {
 }
 
 post {
-  url: localhost:8080
-  body: none
+  url: http://localhost:8080/value/
+  body: json
   auth: none
+}
+
+params:query {
+  ~Content-Type: application/json
+  ~Accept-Encoding: gzip
+  ~Key: Key
+  ~: 
+}
+
+headers {
+  Content-Type: application/json
+  Accept-Encoding: gzip
+  Key: Key
+}
+
+body:json {
+  {
+    "id": "PollCount",
+    "type": "counter"
+  }
 }

@@ -36,7 +36,7 @@ func NewAgent(conf config.Agent) *Agent {
 		sender:         sender.NewSender(conf.ServerAddress, conf.Key),
 		workerPool:     sender.NewWorkerPool(conf.RateLimit),
 		metricsChan:    make(chan map[string]*models.Metric, conf.RateLimit*10),
-		metricsBuffer:  make(map[string]*models.Metric),
+		metricsBuffer:  make(map[string]*models.Metric, 100),
 		shutdownSignal: make(chan struct{}),
 	}
 }

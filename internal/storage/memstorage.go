@@ -11,7 +11,7 @@ import (
 type MemStorage struct {
 	gauges   map[string]float64
 	counters map[string]int64
-	mu       sync.Mutex
+	mu       sync.RWMutex
 	filePath string
 }
 
@@ -38,8 +38,8 @@ func (m *MemStorage) AddCounter(ctx context.Context, name string, value int64) e
 }
 
 func (m *MemStorage) GetGauge(ctx context.Context, name string) (*float64, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	value, exists := m.gauges[name]
 	if !exists {
 		return nil, sql.ErrNoRows
@@ -48,8 +48,8 @@ func (m *MemStorage) GetGauge(ctx context.Context, name string) (*float64, error
 }
 
 func (m *MemStorage) GetCounter(ctx context.Context, name string) (*int64, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	value, exists := m.counters[name]
 	if !exists {
 		return nil, sql.ErrNoRows

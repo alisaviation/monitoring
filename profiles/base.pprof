@@ -1,0 +1,89 @@
+heap profile: 4: 463104 [4: 463105] @ heap/1048576
+0: 0 [0: 0] @ 0x573bcb3 0x5746947 0x5746908 0x57ce2c6 0x57d364a 0x57c8b25 0x57c87e5 0x57c6a4b 0x57dffcf 0x57e0a7e 0x5789889 0x578b724 0x5792d8e 0x5787fe5 0x55ca2c1
+#	0x573bcb2	compress/flate.(*compressor).init+0x432		/usr/local/go/src/compress/flate/deflate.go:587
+#	0x5746946	compress/flate.NewWriter+0x2a6			/usr/local/go/src/compress/flate/deflate.go:664
+#	0x5746907	compress/gzip.(*Writer).Write+0x267		/usr/local/go/src/compress/gzip/gzip.go:191
+#	0x57ce2c5	runtime/pprof.(*profileBuilder).build+0x5a5	/usr/local/go/src/runtime/pprof/proto.go:390
+#	0x57d3649	runtime/pprof.writeHeapProto+0x5c9		/usr/local/go/src/runtime/pprof/protomem.go:66
+#	0x57c8b24	runtime/pprof.writeHeapInternal+0x2a4		/usr/local/go/src/runtime/pprof/pprof.go:634
+#	0x57c87e4	runtime/pprof.writeHeap+0x24			/usr/local/go/src/runtime/pprof/pprof.go:593
+#	0x57c6a4a	runtime/pprof.(*Profile).WriteTo+0x14a		/usr/local/go/src/runtime/pprof/pprof.go:377
+#	0x57dffce	net/http/pprof.handler.ServeHTTP+0x52e		/usr/local/go/src/net/http/pprof/pprof.go:272
+#	0x57e0a7d	net/http/pprof.Index+0xdd			/usr/local/go/src/net/http/pprof/pprof.go:389
+#	0x5789888	net/http.HandlerFunc.ServeHTTP+0x28		/usr/local/go/src/net/http/server.go:2294
+#	0x578b723	net/http.(*ServeMux).ServeHTTP+0x1c3		/usr/local/go/src/net/http/server.go:2822
+#	0x5792d8d	net/http.serverHandler.ServeHTTP+0x8d		/usr/local/go/src/net/http/server.go:3301
+#	0x5787fe4	net/http.(*conn).serve+0x624			/usr/local/go/src/net/http/server.go:2102
+
+0: 0 [0: 0] @ 0x574692e 0x5746908 0x57ce2c6 0x57d364a 0x57c8b25 0x57c87e5 0x57c6a4b 0x57dffcf 0x57e0a7e 0x5789889 0x578b724 0x5792d8e 0x5787fe5 0x55ca2c1
+#	0x574692d	compress/flate.NewWriter+0x28d			/usr/local/go/src/compress/flate/deflate.go:663
+#	0x5746907	compress/gzip.(*Writer).Write+0x267		/usr/local/go/src/compress/gzip/gzip.go:191
+#	0x57ce2c5	runtime/pprof.(*profileBuilder).build+0x5a5	/usr/local/go/src/runtime/pprof/proto.go:390
+#	0x57d3649	runtime/pprof.writeHeapProto+0x5c9		/usr/local/go/src/runtime/pprof/protomem.go:66
+#	0x57c8b24	runtime/pprof.writeHeapInternal+0x2a4		/usr/local/go/src/runtime/pprof/pprof.go:634
+#	0x57c87e4	runtime/pprof.writeHeap+0x24			/usr/local/go/src/runtime/pprof/pprof.go:593
+#	0x57c6a4a	runtime/pprof.(*Profile).WriteTo+0x14a		/usr/local/go/src/runtime/pprof/pprof.go:377
+#	0x57dffce	net/http/pprof.handler.ServeHTTP+0x52e		/usr/local/go/src/net/http/pprof/pprof.go:272
+#	0x57e0a7d	net/http/pprof.Index+0xdd			/usr/local/go/src/net/http/pprof/pprof.go:389
+#	0x5789888	net/http.HandlerFunc.ServeHTTP+0x28		/usr/local/go/src/net/http/server.go:2294
+#	0x578b723	net/http.(*ServeMux).ServeHTTP+0x1c3		/usr/local/go/src/net/http/server.go:2822
+#	0x5792d8d	net/http.serverHandler.ServeHTTP+0x8d		/usr/local/go/src/net/http/server.go:3301
+#	0x5787fe4	net/http.(*conn).serve+0x624			/usr/local/go/src/net/http/server.go:2102
+
+1: 256 [1: 256] @ 0x586cb7e 0x586cb9b 0x55ca2c1
+#	0x586cb7d	net/http.ListenAndServe+0x1d	/usr/local/go/src/net/http/server.go:3664
+#	0x586cb9a	main.main.func1+0x3a		/Users/eaobolenskaya/monitoring/cmd/server/main.go:20
+
+2: 4096 [2: 4096] @ 0x5591831 0x5592255 0x5592939 0x55c236c 0x5594efe 0x559538f 0x5590f6d 0x5590e8a 0x55c8365
+#	0x5591830	runtime.allocm+0x90		/usr/local/go/src/runtime/proc.go:2233
+#	0x5592254	runtime.newm+0x34		/usr/local/go/src/runtime/proc.go:2769
+#	0x5592938	runtime.startm+0x158		/usr/local/go/src/runtime/proc.go:2995
+#	0x55c236b	runtime.wakep+0xeb		/usr/local/go/src/runtime/proc.go:3142
+#	0x5594efd	runtime.resetspinning+0x3d	/usr/local/go/src/runtime/proc.go:3882
+#	0x559538e	runtime.schedule+0x10e		/usr/local/go/src/runtime/proc.go:4035
+#	0x5590f6c	runtime.mstart1+0xcc		/usr/local/go/src/runtime/proc.go:1862
+#	0x5590e89	runtime.mstart0+0x69		/usr/local/go/src/runtime/proc.go:1808
+#	0x55c8364	runtime.mstart+0x4		/usr/local/go/src/runtime/asm_amd64.s:395
+
+1: 458752 [1: 458752] @ 0x583bc85 0x583bcad 0x5845834 0x58456c6 0x584b919 0x584a7bf 0x584a5c5 0x5844b25 0x585b5ff 0x586c825 0x558db0b 0x55ca2c1
+#	0x583bc84	go.uber.org/zap/zapcore.newCounters+0x44				/Users/eaobolenskaya/go/pkg/mod/go.uber.org/zap@v1.27.0/zapcore/sampler.go:41
+#	0x583bcac	go.uber.org/zap/zapcore.NewSamplerWithOptions+0x6c			/Users/eaobolenskaya/go/pkg/mod/go.uber.org/zap@v1.27.0/zapcore/sampler.go:156
+#	0x5845833	go.uber.org/zap.Config.buildOptions.func1+0x113				/Users/eaobolenskaya/go/pkg/mod/go.uber.org/zap@v1.27.0/config.go:289
+#	0x58456c5	go.uber.org/zap.Config.buildOptions.WrapCore.func5+0x25			/Users/eaobolenskaya/go/pkg/mod/go.uber.org/zap@v1.27.0/options.go:44
+#	0x584b918	go.uber.org/zap.optionFunc.apply+0x18					/Users/eaobolenskaya/go/pkg/mod/go.uber.org/zap@v1.27.0/options.go:38
+#	0x584a7be	go.uber.org/zap.(*Logger).WithOptions+0x9e				/Users/eaobolenskaya/go/pkg/mod/go.uber.org/zap@v1.27.0/logger.go:172
+#	0x584a5c4	go.uber.org/zap.New+0x184						/Users/eaobolenskaya/go/pkg/mod/go.uber.org/zap@v1.27.0/logger.go:79
+#	0x5844b24	go.uber.org/zap.Config.Build+0x264					/Users/eaobolenskaya/go/pkg/mod/go.uber.org/zap@v1.27.0/config.go:254
+#	0x585b5fe	github.com/alisaviation/monitoring/internal/logger.Initialize+0xbe	/Users/eaobolenskaya/monitoring/internal/logger/logger.go:20
+#	0x586c824	main.main+0x1a4								/Users/eaobolenskaya/monitoring/cmd/server/main.go:28
+#	0x558db0a	runtime.main+0x28a							/usr/local/go/src/runtime/proc.go:283
+
+
+# runtime.MemStats
+# Alloc = 2341080
+# TotalAlloc = 2341080
+# Sys = 13063432
+# Lookups = 0
+# Mallocs = 4676
+# Frees = 447
+# HeapAlloc = 2341080
+# HeapSys = 7864320
+# HeapIdle = 4235264
+# HeapInuse = 3629056
+# HeapReleased = 4194304
+# HeapObjects = 4229
+# Stack = 524288 / 524288
+# MSpan = 64800 / 65280
+# MCache = 12080 / 15704
+# BuckHashSys = 1444669
+# GCSys = 1934816
+# OtherSys = 1214355
+# NextGC = 4194304
+# LastGC = 0
+# PauseNs = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]
+# PauseEnd = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]
+# NumGC = 0
+# NumForcedGC = 0
+# GCCPUFraction = 0
+# DebugGC = false
+# MaxRSS = 13484032

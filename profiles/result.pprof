@@ -1,0 +1,273 @@
+heap profile: 5: 706752 [5: 706753] @ heap/1048576
+0: 0 [0: 0] @ 0x38fdd76 0x38fdd62 0x3908947 0x3908908 0x3a21853 0x3a21682 0x3a27ab5 0x3a2da64 0x394b889 0x3a22da2 0x394b889 0x3a2ccdb 0x394b889 0x3a210d7 0x394b889 0x3a1dbcc 0x394b889 0x3a226ce 0x3954e2e 0x3949fe5 0x378c2c1
+#	0x38fdd75	compress/flate.(*compressor).initDeflate+0x4f5													/usr/local/go/src/compress/flate/deflate.go:370
+#	0x38fdd61	compress/flate.(*compressor).init+0x4e1														/usr/local/go/src/compress/flate/deflate.go:593
+#	0x3908946	compress/flate.NewWriter+0x2a6															/usr/local/go/src/compress/flate/deflate.go:664
+#	0x3908907	compress/gzip.(*Writer).Write+0x267														/usr/local/go/src/compress/gzip/gzip.go:191
+#	0x3a21852	github.com/alisaviation/monitoring/internal/middleware.gzipWriter.Write+0x32									/Users/eaobolenskaya/monitoring/internal/middleware/middleware.go:47
+#	0x3a21681	github.com/alisaviation/monitoring/internal/middleware.(*responseWriterWrapper).Write+0xe1							/Users/eaobolenskaya/monitoring/internal/middleware/middleware.go:124
+#	0x3a27ab4	github.com/alisaviation/monitoring/internal/server.(*Server).UpdateBatchMetrics+0x754								/Users/eaobolenskaya/monitoring/internal/server/handlers.go:165
+#	0x3a2da63	github.com/alisaviation/monitoring/internal/server.(*ServerApp).registerRoutes.(*ServerApp).registerRoutes.MethodCheck.func15.func16+0xa3	/Users/eaobolenskaya/monitoring/internal/helpers/helpers.go:34
+#	0x394b888	net/http.HandlerFunc.ServeHTTP+0x28														/usr/local/go/src/net/http/server.go:2294
+#	0x3a22da1	github.com/go-chi/chi/v5.(*Mux).routeHTTP+0x2e1													/Users/eaobolenskaya/go/pkg/mod/github.com/go-chi/chi/v5@v5.2.1/mux.go:480
+#	0x394b888	net/http.HandlerFunc.ServeHTTP+0x28														/usr/local/go/src/net/http/server.go:2294
+#	0x3a2ccda	github.com/alisaviation/monitoring/internal/server.(*ServerApp).startHTTPServer.SyncSaveMiddleware.func2.1+0x35a				/Users/eaobolenskaya/monitoring/internal/middleware/middleware.go:88
+#	0x394b888	net/http.HandlerFunc.ServeHTTP+0x28														/usr/local/go/src/net/http/server.go:2294
+#	0x3a210d6	github.com/alisaviation/monitoring/internal/middleware.GzipMiddleware.func1+0x2b6								/Users/eaobolenskaya/monitoring/internal/middleware/middleware.go:37
+#	0x394b888	net/http.HandlerFunc.ServeHTTP+0x28														/usr/local/go/src/net/http/server.go:2294
+#	0x3a1dbcb	github.com/alisaviation/monitoring/internal/logger.RequestResponseLogger.func1+0x4cb								/Users/eaobolenskaya/monitoring/internal/logger/logger.go:85
+#	0x394b888	net/http.HandlerFunc.ServeHTTP+0x28														/usr/local/go/src/net/http/server.go:2294
+#	0x3a226cd	github.com/go-chi/chi/v5.(*Mux).ServeHTTP+0x2ed													/Users/eaobolenskaya/go/pkg/mod/github.com/go-chi/chi/v5@v5.2.1/mux.go:90
+#	0x3954e2d	net/http.serverHandler.ServeHTTP+0x8d														/usr/local/go/src/net/http/server.go:3301
+#	0x3949fe4	net/http.(*conn).serve+0x624															/usr/local/go/src/net/http/server.go:2102
+
+0: 0 [0: 0] @ 0x3753831 0x3754255 0x3754939 0x378436c 0x3756efe 0x375738f 0x37577e5 0x378a3ee
+#	0x3753830	runtime.allocm+0x90		/usr/local/go/src/runtime/proc.go:2233
+#	0x3754254	runtime.newm+0x34		/usr/local/go/src/runtime/proc.go:2769
+#	0x3754938	runtime.startm+0x158		/usr/local/go/src/runtime/proc.go:2995
+#	0x378436b	runtime.wakep+0xeb		/usr/local/go/src/runtime/proc.go:3142
+#	0x3756efd	runtime.resetspinning+0x3d	/usr/local/go/src/runtime/proc.go:3882
+#	0x375738e	runtime.schedule+0x10e		/usr/local/go/src/runtime/proc.go:4035
+#	0x37577e4	runtime.park_m+0x284		/usr/local/go/src/runtime/proc.go:4141
+#	0x378a3ed	runtime.mcall+0x4d		/usr/local/go/src/runtime/asm_amd64.s:459
+
+1: 192 [1: 192] @ 0x3a2eb3f 0x3a2eb33 0x378c2c1
+#	0x3a2eb3e	net/http.NewServeMux+0x1e	/usr/local/go/src/net/http/server.go:2590
+#	0x3a2eb32	main.main.func1+0x12		/Users/eaobolenskaya/monitoring/cmd/server/main.go:24
+
+1: 2048 [1: 2048] @ 0x3753831 0x3754255 0x3754939 0x378436c 0x3756efe 0x375738f 0x3752f6d 0x3752e8a 0x378a365
+#	0x3753830	runtime.allocm+0x90		/usr/local/go/src/runtime/proc.go:2233
+#	0x3754254	runtime.newm+0x34		/usr/local/go/src/runtime/proc.go:2769
+#	0x3754938	runtime.startm+0x158		/usr/local/go/src/runtime/proc.go:2995
+#	0x378436b	runtime.wakep+0xeb		/usr/local/go/src/runtime/proc.go:3142
+#	0x3756efd	runtime.resetspinning+0x3d	/usr/local/go/src/runtime/proc.go:3882
+#	0x375738e	runtime.schedule+0x10e		/usr/local/go/src/runtime/proc.go:4035
+#	0x3752f6c	runtime.mstart1+0xcc		/usr/local/go/src/runtime/proc.go:1862
+#	0x3752e89	runtime.mstart0+0x69		/usr/local/go/src/runtime/proc.go:1808
+#	0x378a364	runtime.mstart+0x4		/usr/local/go/src/runtime/asm_amd64.s:395
+
+1: 8192 [1: 8192] @ 0x39068e5 0x3905eaf 0x3905ea5 0x3905a62 0x379eb4b 0x379ea79 0x39059cd 0x3906109 0x3907485 0x3906ff8 0x3a2114f 0x3a21076 0x394b889 0x3a1dbcc 0x394b889 0x3a226ce 0x3954e2e 0x3949fe5 0x378c2c1
+#	0x39068e4	hash/crc32.slicingMakeTable+0x24							/usr/local/go/src/hash/crc32/crc32_generic.go:61
+#	0x3905eae	hash/crc32.archInitIEEE+0x2e								/usr/local/go/src/hash/crc32/crc32_amd64.go:207
+#	0x3905ea4	hash/crc32.init.func2+0x24								/usr/local/go/src/hash/crc32/crc32.go:109
+#	0x3905a61	hash/crc32.init.OnceFunc.func5+0x61							/usr/local/go/src/sync/oncefunc.go:27
+#	0x379eb4a	sync.(*Once).doSlow+0xaa								/usr/local/go/src/sync/once.go:78
+#	0x379ea78	sync.(*Once).Do+0x18									/usr/local/go/src/sync/once.go:69
+#	0x39059cc	hash/crc32.init.OnceFunc.func6+0x2c							/usr/local/go/src/sync/oncefunc.go:32
+#	0x3906108	hash/crc32.ChecksumIEEE+0x28								/usr/local/go/src/hash/crc32/crc32.go:239
+#	0x3907484	compress/gzip.(*Reader).readHeader+0x144						/usr/local/go/src/compress/gzip/gunzip.go:196
+#	0x3906ff7	compress/gzip.(*Reader).Reset+0x297							/usr/local/go/src/compress/gzip/gunzip.go:113
+#	0x3a2114e	compress/gzip.NewReader+0x32e								/usr/local/go/src/compress/gzip/gunzip.go:94
+#	0x3a21075	github.com/alisaviation/monitoring/internal/middleware.GzipMiddleware.func1+0x255	/Users/eaobolenskaya/monitoring/internal/middleware/middleware.go:28
+#	0x394b888	net/http.HandlerFunc.ServeHTTP+0x28							/usr/local/go/src/net/http/server.go:2294
+#	0x3a1dbcb	github.com/alisaviation/monitoring/internal/logger.RequestResponseLogger.func1+0x4cb	/Users/eaobolenskaya/monitoring/internal/logger/logger.go:85
+#	0x394b888	net/http.HandlerFunc.ServeHTTP+0x28							/usr/local/go/src/net/http/server.go:2294
+#	0x3a226cd	github.com/go-chi/chi/v5.(*Mux).ServeHTTP+0x2ed						/Users/eaobolenskaya/go/pkg/mod/github.com/go-chi/chi/v5@v5.2.1/mux.go:90
+#	0x3954e2d	net/http.serverHandler.ServeHTTP+0x8d							/usr/local/go/src/net/http/server.go:3301
+#	0x3949fe4	net/http.(*conn).serve+0x624								/usr/local/go/src/net/http/server.go:2102
+
+1: 32768 [1: 32768] @ 0x390510c 0x390508e 0x39076a6 0x3906ff8 0x3a2114f 0x3a21076 0x394b889 0x3a1dbcc 0x394b889 0x3a226ce 0x3954e2e 0x3949fe5 0x378c2c1
+#	0x390510b	compress/flate.(*dictDecoder).init+0x18b						/usr/local/go/src/compress/flate/dict_decoder.go:43
+#	0x390508d	compress/flate.NewReader+0x10d								/usr/local/go/src/compress/flate/inflate.go:815
+#	0x39076a5	compress/gzip.(*Reader).readHeader+0x365						/usr/local/go/src/compress/gzip/gunzip.go:238
+#	0x3906ff7	compress/gzip.(*Reader).Reset+0x297							/usr/local/go/src/compress/gzip/gunzip.go:113
+#	0x3a2114e	compress/gzip.NewReader+0x32e								/usr/local/go/src/compress/gzip/gunzip.go:94
+#	0x3a21075	github.com/alisaviation/monitoring/internal/middleware.GzipMiddleware.func1+0x255	/Users/eaobolenskaya/monitoring/internal/middleware/middleware.go:28
+#	0x394b888	net/http.HandlerFunc.ServeHTTP+0x28							/usr/local/go/src/net/http/server.go:2294
+#	0x3a1dbcb	github.com/alisaviation/monitoring/internal/logger.RequestResponseLogger.func1+0x4cb	/Users/eaobolenskaya/monitoring/internal/logger/logger.go:85
+#	0x394b888	net/http.HandlerFunc.ServeHTTP+0x28							/usr/local/go/src/net/http/server.go:2294
+#	0x3a226cd	github.com/go-chi/chi/v5.(*Mux).ServeHTTP+0x2ed						/Users/eaobolenskaya/go/pkg/mod/github.com/go-chi/chi/v5@v5.2.1/mux.go:90
+#	0x3954e2d	net/http.serverHandler.ServeHTTP+0x8d							/usr/local/go/src/net/http/server.go:3301
+#	0x3949fe4	net/http.(*conn).serve+0x624								/usr/local/go/src/net/http/server.go:2102
+
+1: 663552 [1: 663552] @ 0x390892e 0x3908908 0x3a21853 0x3a21682 0x3a27ab5 0x3a2da64 0x394b889 0x3a22da2 0x394b889 0x3a2ccdb 0x394b889 0x3a210d7 0x394b889 0x3a1dbcc 0x394b889 0x3a226ce 0x3954e2e 0x3949fe5 0x378c2c1
+#	0x390892d	compress/flate.NewWriter+0x28d															/usr/local/go/src/compress/flate/deflate.go:663
+#	0x3908907	compress/gzip.(*Writer).Write+0x267														/usr/local/go/src/compress/gzip/gzip.go:191
+#	0x3a21852	github.com/alisaviation/monitoring/internal/middleware.gzipWriter.Write+0x32									/Users/eaobolenskaya/monitoring/internal/middleware/middleware.go:47
+#	0x3a21681	github.com/alisaviation/monitoring/internal/middleware.(*responseWriterWrapper).Write+0xe1							/Users/eaobolenskaya/monitoring/internal/middleware/middleware.go:124
+#	0x3a27ab4	github.com/alisaviation/monitoring/internal/server.(*Server).UpdateBatchMetrics+0x754								/Users/eaobolenskaya/monitoring/internal/server/handlers.go:165
+#	0x3a2da63	github.com/alisaviation/monitoring/internal/server.(*ServerApp).registerRoutes.(*ServerApp).registerRoutes.MethodCheck.func15.func16+0xa3	/Users/eaobolenskaya/monitoring/internal/helpers/helpers.go:34
+#	0x394b888	net/http.HandlerFunc.ServeHTTP+0x28														/usr/local/go/src/net/http/server.go:2294
+#	0x3a22da1	github.com/go-chi/chi/v5.(*Mux).routeHTTP+0x2e1													/Users/eaobolenskaya/go/pkg/mod/github.com/go-chi/chi/v5@v5.2.1/mux.go:480
+#	0x394b888	net/http.HandlerFunc.ServeHTTP+0x28														/usr/local/go/src/net/http/server.go:2294
+#	0x3a2ccda	github.com/alisaviation/monitoring/internal/server.(*ServerApp).startHTTPServer.SyncSaveMiddleware.func2.1+0x35a				/Users/eaobolenskaya/monitoring/internal/middleware/middleware.go:88
+#	0x394b888	net/http.HandlerFunc.ServeHTTP+0x28														/usr/local/go/src/net/http/server.go:2294
+#	0x3a210d6	github.com/alisaviation/monitoring/internal/middleware.GzipMiddleware.func1+0x2b6								/Users/eaobolenskaya/monitoring/internal/middleware/middleware.go:37
+#	0x394b888	net/http.HandlerFunc.ServeHTTP+0x28														/usr/local/go/src/net/http/server.go:2294
+#	0x3a1dbcb	github.com/alisaviation/monitoring/internal/logger.RequestResponseLogger.func1+0x4cb								/Users/eaobolenskaya/monitoring/internal/logger/logger.go:85
+#	0x394b888	net/http.HandlerFunc.ServeHTTP+0x28														/usr/local/go/src/net/http/server.go:2294
+#	0x3a226cd	github.com/go-chi/chi/v5.(*Mux).ServeHTTP+0x2ed													/Users/eaobolenskaya/go/pkg/mod/github.com/go-chi/chi/v5@v5.2.1/mux.go:90
+#	0x3954e2d	net/http.serverHandler.ServeHTTP+0x8d														/usr/local/go/src/net/http/server.go:3301
+#	0x3949fe4	net/http.(*conn).serve+0x624															/usr/local/go/src/net/http/server.go:2102
+
+
+# runtime.MemStats
+# Alloc = 2177312
+# TotalAlloc = 4032256
+# Sys = 13391112
+# Lookups = 0
+# Mallocs = 2921
+# Frees = 1438
+# HeapAlloc = 2177312
+# HeapSys = 7798784
+# HeapIdle = 4587520
+# HeapInuse = 3211264
+# HeapReleased = 3186688
+# HeapObjects = 1483
+# Stack = 589824 / 589824
+# MSpan = 75040 / 81600
+# MCache = 12080 / 15704
+# BuckHashSys = 1445333
+# GCSys = 1951008
+# OtherSys = 1508859
+# NextGC = 4194304
+# LastGC = 1754769886770473000
+# PauseNs = [67458 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]
+# PauseEnd = [1754769886770473000 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]
+# NumGC = 1
+# NumForcedGC = 0
+# GCCPUFraction = 2.342217371145047e-05
+# DebugGC = false
+# MaxRSS = 15413248
+
+
+
+
+heap profile: 7: 1405136 [9: 2068768] @ heap/1048576
+0: 0 [1: 663552] @ 0x1a8592e 0x1a85908 0x1b9e853 0x1960fef 0x1ac8ad2 0x1ac8b8e 0x1b9fd51 0x1b9fd34 0x1ac8889 0x1ba9b03 0x1ac8889 0x1b9e0d7 0x1ac8889 0x1b9abcc 0x1ac8889 0x1b9f6ce 0x1ad1e2e 0x1ac6fe5 0x19092c1
+#	0x1a8592d	compress/flate.NewWriter+0x28d												/usr/local/go/src/compress/flate/deflate.go:663
+#	0x1a85907	compress/gzip.(*Writer).Write+0x267											/usr/local/go/src/compress/gzip/gzip.go:191
+#	0x1b9e852	github.com/alisaviation/monitoring/internal/middleware.gzipWriter.Write+0x32						/Users/eaobolenskaya/monitoring/internal/middleware/middleware.go:47
+#	0x1960fee	fmt.Fprintln+0x6e													/usr/local/go/src/fmt/print.go:305
+#	0x1ac8ad1	net/http.Error+0x211													/usr/local/go/src/net/http/server.go:2326
+#	0x1ac8b8d	net/http.NotFound+0x2d													/usr/local/go/src/net/http/server.go:2330
+#	0x1b9fd50	net/http.HandlerFunc.ServeHTTP+0x290											/usr/local/go/src/net/http/server.go:2294
+#	0x1b9fd33	github.com/go-chi/chi/v5.(*Mux).routeHTTP+0x273										/Users/eaobolenskaya/go/pkg/mod/github.com/go-chi/chi/v5@v5.2.1/mux.go:486
+#	0x1ac8888	net/http.HandlerFunc.ServeHTTP+0x28											/usr/local/go/src/net/http/server.go:2294
+#	0x1ba9b02	github.com/alisaviation/monitoring/internal/server.(*ServerApp).startHTTPServer.SyncSaveMiddleware.func2.1+0x182	/Users/eaobolenskaya/monitoring/internal/middleware/middleware.go:91
+#	0x1ac8888	net/http.HandlerFunc.ServeHTTP+0x28											/usr/local/go/src/net/http/server.go:2294
+#	0x1b9e0d6	github.com/alisaviation/monitoring/internal/middleware.GzipMiddleware.func1+0x2b6					/Users/eaobolenskaya/monitoring/internal/middleware/middleware.go:37
+#	0x1ac8888	net/http.HandlerFunc.ServeHTTP+0x28											/usr/local/go/src/net/http/server.go:2294
+#	0x1b9abcb	github.com/alisaviation/monitoring/internal/logger.RequestResponseLogger.func1+0x4cb					/Users/eaobolenskaya/monitoring/internal/logger/logger.go:85
+#	0x1ac8888	net/http.HandlerFunc.ServeHTTP+0x28											/usr/local/go/src/net/http/server.go:2294
+#	0x1b9f6cd	github.com/go-chi/chi/v5.(*Mux).ServeHTTP+0x2ed										/Users/eaobolenskaya/go/pkg/mod/github.com/go-chi/chi/v5@v5.2.1/mux.go:90
+#	0x1ad1e2d	net/http.serverHandler.ServeHTTP+0x8d											/usr/local/go/src/net/http/server.go:3301
+#	0x1ac6fe4	net/http.(*conn).serve+0x624												/usr/local/go/src/net/http/server.go:2102
+
+0: 0 [1: 80] @ 0x19e891c 0x19e88d3 0x19e69e5 0x19d67e5 0x19d95db 0x19d9b9a 0x1acbd30 0x1babc48 0x19092c1
+#	0x19e891b	net.lookupIPReturn+0x9db		/usr/local/go/src/net/lookup.go:387
+#	0x19e88d2	net.(*Resolver).lookupIPAddr+0x992	/usr/local/go/src/net/lookup.go:375
+#	0x19e69e4	net.(*Resolver).internetAddrList+0x4c4	/usr/local/go/src/net/ipsock.go:289
+#	0x19d67e4	net.(*Resolver).resolveAddrList+0x3e4	/usr/local/go/src/net/dial.go:353
+#	0x19d95da	net.(*ListenConfig).Listen+0x7a		/usr/local/go/src/net/dial.go:805
+#	0x19d9b99	net.Listen+0x59				/usr/local/go/src/net/dial.go:898
+#	0x1acbd2f	net/http.(*Server).ListenAndServe+0x4f	/usr/local/go/src/net/http/server.go:3346
+#	0x1babc47	main.main.func1+0x127			/Users/eaobolenskaya/monitoring/cmd/server/main.go:35
+
+1: 16 [1: 16] @ 0x1a70587 0x1a703b2 0x1a6f2a8 0x1b9adc5 0x1b9adb0 0x1ac8889 0x1b9f6ce 0x1ad1e2e 0x1ac6fe5 0x19092c1
+#	0x1a70586	net/textproto.canonicalMIMEHeaderKey+0x186						/usr/local/go/src/net/textproto/reader.go:788
+#	0x1a703b1	net/textproto.CanonicalMIMEHeaderKey+0xd1						/usr/local/go/src/net/textproto/reader.go:660
+#	0x1a6f2a7	net/textproto.MIMEHeader.Get+0x27							/usr/local/go/src/net/textproto/header.go:34
+#	0x1b9adc4	net/http.Header.Get+0x6c4								/usr/local/go/src/net/http/header.go:50
+#	0x1b9adaf	github.com/alisaviation/monitoring/internal/logger.RequestResponseLogger.func1+0x6af	/Users/eaobolenskaya/monitoring/internal/logger/logger.go:95
+#	0x1ac8888	net/http.HandlerFunc.ServeHTTP+0x28							/usr/local/go/src/net/http/server.go:2294
+#	0x1b9f6cd	github.com/go-chi/chi/v5.(*Mux).ServeHTTP+0x2ed						/Users/eaobolenskaya/go/pkg/mod/github.com/go-chi/chi/v5@v5.2.1/mux.go:90
+#	0x1ad1e2d	net/http.serverHandler.ServeHTTP+0x8d							/usr/local/go/src/net/http/server.go:3301
+#	0x1ac6fe4	net/http.(*conn).serve+0x624								/usr/local/go/src/net/http/server.go:2102
+
+1: 192 [1: 192] @ 0x1babb3f 0x1babb33 0x19092c1
+#	0x1babb3e	net/http.NewServeMux+0x1e	/usr/local/go/src/net/http/server.go:2590
+#	0x1babb32	main.main.func1+0x12		/Users/eaobolenskaya/monitoring/cmd/server/main.go:24
+
+1: 2048 [1: 2048] @ 0x18d0831 0x18d1255 0x18d1939 0x190136c 0x18d3efe 0x18d438f 0x18d47e5 0x19073ee
+#	0x18d0830	runtime.allocm+0x90		/usr/local/go/src/runtime/proc.go:2233
+#	0x18d1254	runtime.newm+0x34		/usr/local/go/src/runtime/proc.go:2769
+#	0x18d1938	runtime.startm+0x158		/usr/local/go/src/runtime/proc.go:2995
+#	0x190136b	runtime.wakep+0xeb		/usr/local/go/src/runtime/proc.go:3142
+#	0x18d3efd	runtime.resetspinning+0x3d	/usr/local/go/src/runtime/proc.go:3882
+#	0x18d438e	runtime.schedule+0x10e		/usr/local/go/src/runtime/proc.go:4035
+#	0x18d47e4	runtime.park_m+0x284		/usr/local/go/src/runtime/proc.go:4141
+#	0x19073ed	runtime.mcall+0x4d		/usr/local/go/src/runtime/asm_amd64.s:459
+
+1: 2048 [1: 2048] @ 0x18d0831 0x18d1255 0x18d1939 0x190136c 0x18d3efe 0x18d438f 0x18cff6d 0x18cfe8a 0x1907365
+#	0x18d0830	runtime.allocm+0x90		/usr/local/go/src/runtime/proc.go:2233
+#	0x18d1254	runtime.newm+0x34		/usr/local/go/src/runtime/proc.go:2769
+#	0x18d1938	runtime.startm+0x158		/usr/local/go/src/runtime/proc.go:2995
+#	0x190136b	runtime.wakep+0xeb		/usr/local/go/src/runtime/proc.go:3142
+#	0x18d3efd	runtime.resetspinning+0x3d	/usr/local/go/src/runtime/proc.go:3882
+#	0x18d438e	runtime.schedule+0x10e		/usr/local/go/src/runtime/proc.go:4035
+#	0x18cff6c	runtime.mstart1+0xcc		/usr/local/go/src/runtime/proc.go:1862
+#	0x18cfe89	runtime.mstart0+0x69		/usr/local/go/src/runtime/proc.go:1808
+#	0x1907364	runtime.mstart+0x4		/usr/local/go/src/runtime/asm_amd64.s:395
+
+1: 73728 [1: 73728] @ 0x1a7add8 0x1a7ad62 0x1a85947 0x1a85908 0x1b9e853 0x1b9e682 0x1ba4ab5 0x1baaa64 0x1ac8889 0x1b9fda2 0x1ac8889 0x1ba9cdb 0x1ac8889 0x1b9e0d7 0x1ac8889 0x1b9abcc 0x1ac8889 0x1b9f6ce 0x1ad1e2e 0x1ac6fe5 0x19092c1
+#	0x1a7add7	compress/flate.(*compressor).initDeflate+0x557													/usr/local/go/src/compress/flate/deflate.go:372
+#	0x1a7ad61	compress/flate.(*compressor).init+0x4e1														/usr/local/go/src/compress/flate/deflate.go:593
+#	0x1a85946	compress/flate.NewWriter+0x2a6															/usr/local/go/src/compress/flate/deflate.go:664
+#	0x1a85907	compress/gzip.(*Writer).Write+0x267														/usr/local/go/src/compress/gzip/gzip.go:191
+#	0x1b9e852	github.com/alisaviation/monitoring/internal/middleware.gzipWriter.Write+0x32									/Users/eaobolenskaya/monitoring/internal/middleware/middleware.go:47
+#	0x1b9e681	github.com/alisaviation/monitoring/internal/middleware.(*responseWriterWrapper).Write+0xe1							/Users/eaobolenskaya/monitoring/internal/middleware/middleware.go:124
+#	0x1ba4ab4	github.com/alisaviation/monitoring/internal/server.(*Server).UpdateBatchMetrics+0x754								/Users/eaobolenskaya/monitoring/internal/server/handlers.go:165
+#	0x1baaa63	github.com/alisaviation/monitoring/internal/server.(*ServerApp).registerRoutes.(*ServerApp).registerRoutes.MethodCheck.func15.func16+0xa3	/Users/eaobolenskaya/monitoring/internal/helpers/helpers.go:34
+#	0x1ac8888	net/http.HandlerFunc.ServeHTTP+0x28														/usr/local/go/src/net/http/server.go:2294
+#	0x1b9fda1	github.com/go-chi/chi/v5.(*Mux).routeHTTP+0x2e1													/Users/eaobolenskaya/go/pkg/mod/github.com/go-chi/chi/v5@v5.2.1/mux.go:480
+#	0x1ac8888	net/http.HandlerFunc.ServeHTTP+0x28														/usr/local/go/src/net/http/server.go:2294
+#	0x1ba9cda	github.com/alisaviation/monitoring/internal/server.(*ServerApp).startHTTPServer.SyncSaveMiddleware.func2.1+0x35a				/Users/eaobolenskaya/monitoring/internal/middleware/middleware.go:88
+#	0x1ac8888	net/http.HandlerFunc.ServeHTTP+0x28														/usr/local/go/src/net/http/server.go:2294
+#	0x1b9e0d6	github.com/alisaviation/monitoring/internal/middleware.GzipMiddleware.func1+0x2b6								/Users/eaobolenskaya/monitoring/internal/middleware/middleware.go:37
+#	0x1ac8888	net/http.HandlerFunc.ServeHTTP+0x28														/usr/local/go/src/net/http/server.go:2294
+#	0x1b9abcb	github.com/alisaviation/monitoring/internal/logger.RequestResponseLogger.func1+0x4cb								/Users/eaobolenskaya/monitoring/internal/logger/logger.go:85
+#	0x1ac8888	net/http.HandlerFunc.ServeHTTP+0x28														/usr/local/go/src/net/http/server.go:2294
+#	0x1b9f6cd	github.com/go-chi/chi/v5.(*Mux).ServeHTTP+0x2ed													/Users/eaobolenskaya/go/pkg/mod/github.com/go-chi/chi/v5@v5.2.1/mux.go:90
+#	0x1ad1e2d	net/http.serverHandler.ServeHTTP+0x8d														/usr/local/go/src/net/http/server.go:3301
+#	0x1ac6fe4	net/http.(*conn).serve+0x624															/usr/local/go/src/net/http/server.go:2102
+
+2: 1327104 [2: 1327104] @ 0x1a8592e 0x1a85908 0x1b9e853 0x1b9e682 0x1ba4ab5 0x1baaa64 0x1ac8889 0x1b9fda2 0x1ac8889 0x1ba9cdb 0x1ac8889 0x1b9e0d7 0x1ac8889 0x1b9abcc 0x1ac8889 0x1b9f6ce 0x1ad1e2e 0x1ac6fe5 0x19092c1
+#	0x1a8592d	compress/flate.NewWriter+0x28d															/usr/local/go/src/compress/flate/deflate.go:663
+#	0x1a85907	compress/gzip.(*Writer).Write+0x267														/usr/local/go/src/compress/gzip/gzip.go:191
+#	0x1b9e852	github.com/alisaviation/monitoring/internal/middleware.gzipWriter.Write+0x32									/Users/eaobolenskaya/monitoring/internal/middleware/middleware.go:47
+#	0x1b9e681	github.com/alisaviation/monitoring/internal/middleware.(*responseWriterWrapper).Write+0xe1							/Users/eaobolenskaya/monitoring/internal/middleware/middleware.go:124
+#	0x1ba4ab4	github.com/alisaviation/monitoring/internal/server.(*Server).UpdateBatchMetrics+0x754								/Users/eaobolenskaya/monitoring/internal/server/handlers.go:165
+#	0x1baaa63	github.com/alisaviation/monitoring/internal/server.(*ServerApp).registerRoutes.(*ServerApp).registerRoutes.MethodCheck.func15.func16+0xa3	/Users/eaobolenskaya/monitoring/internal/helpers/helpers.go:34
+#	0x1ac8888	net/http.HandlerFunc.ServeHTTP+0x28														/usr/local/go/src/net/http/server.go:2294
+#	0x1b9fda1	github.com/go-chi/chi/v5.(*Mux).routeHTTP+0x2e1													/Users/eaobolenskaya/go/pkg/mod/github.com/go-chi/chi/v5@v5.2.1/mux.go:480
+#	0x1ac8888	net/http.HandlerFunc.ServeHTTP+0x28														/usr/local/go/src/net/http/server.go:2294
+#	0x1ba9cda	github.com/alisaviation/monitoring/internal/server.(*ServerApp).startHTTPServer.SyncSaveMiddleware.func2.1+0x35a				/Users/eaobolenskaya/monitoring/internal/middleware/middleware.go:88
+#	0x1ac8888	net/http.HandlerFunc.ServeHTTP+0x28														/usr/local/go/src/net/http/server.go:2294
+#	0x1b9e0d6	github.com/alisaviation/monitoring/internal/middleware.GzipMiddleware.func1+0x2b6								/Users/eaobolenskaya/monitoring/internal/middleware/middleware.go:37
+#	0x1ac8888	net/http.HandlerFunc.ServeHTTP+0x28														/usr/local/go/src/net/http/server.go:2294
+#	0x1b9abcb	github.com/alisaviation/monitoring/internal/logger.RequestResponseLogger.func1+0x4cb								/Users/eaobolenskaya/monitoring/internal/logger/logger.go:85
+#	0x1ac8888	net/http.HandlerFunc.ServeHTTP+0x28														/usr/local/go/src/net/http/server.go:2294
+#	0x1b9f6cd	github.com/go-chi/chi/v5.(*Mux).ServeHTTP+0x2ed													/Users/eaobolenskaya/go/pkg/mod/github.com/go-chi/chi/v5@v5.2.1/mux.go:90
+#	0x1ad1e2d	net/http.serverHandler.ServeHTTP+0x8d														/usr/local/go/src/net/http/server.go:3301
+#	0x1ac6fe4	net/http.(*conn).serve+0x624															/usr/local/go/src/net/http/server.go:2102
+
+
+# runtime.MemStats
+# Alloc = 3075456
+# TotalAlloc = 4845232
+# Sys = 13391112
+# Lookups = 0
+# Mallocs = 2912
+# Frees = 1191
+# HeapAlloc = 3075456
+# HeapSys = 7798784
+# HeapIdle = 3588096
+# HeapInuse = 4210688
+# HeapReleased = 3244032
+# HeapObjects = 1721
+# Stack = 589824 / 589824
+# MSpan = 75040 / 81600
+# MCache = 12080 / 15704
+# BuckHashSys = 1445557
+# GCSys = 1969512
+# OtherSys = 1490131
+# NextGC = 4194304
+# LastGC = 1754771123480180000
+# PauseNs = [405917 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]
+# PauseEnd = [1754771123480180000 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]
+# NumGC = 1
+# NumForcedGC = 0
+# GCCPUFraction = 2.9304529818347316e-05
+# DebugGC = false
+# MaxRSS = 15540224

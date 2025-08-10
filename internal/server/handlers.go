@@ -26,6 +26,10 @@ func NewServer(storage storage.Storage, db *sql.DB) *Server {
 }
 
 func (s *Server) PingHandler(w http.ResponseWriter, r *http.Request) {
+	if s.db == nil {
+		http.Error(w, "Database not configured", http.StatusInternalServerError)
+		return
+	}
 
 	if err := s.db.PingContext(r.Context()); err != nil {
 		http.Error(w, "Database connection failed", http.StatusInternalServerError)

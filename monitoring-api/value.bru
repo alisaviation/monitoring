@@ -13,6 +13,7 @@ get {
 headers {
   Content-Type: application/json
   Accept-Encoding: gzip
+  Key: key
   ~Content-Encoding: gzip
 }
 
@@ -25,4 +26,12 @@ body:json {
     "id": "PollCount",
     "type": "counter"
   }
+}
+
+vars:pre-request {
+  ~: 
+}
+
+vars:post-response {
+  ~: 
 }
