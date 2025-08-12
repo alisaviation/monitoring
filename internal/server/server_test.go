@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -679,3 +680,323 @@ func testGzipResponse(t *testing.T, srv *Server, method, path, contentType strin
 func pointer[T any](v T) *T {
 	return &v
 }
+
+func Test_UpdateBatchMetrics(t *testing.T) {
+	memStorage := storage.NewMemStorage("")
+	handler := chi.NewRouter()
+
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create mock database: %s", err)
+	}
+	defer db.Close()
+
+	server := &Server{
+		storage: memStorage,
+		db:      db,
+	}
+
+	handler.Post("/updates/", server.UpdateBatchMetrics)
+
+	tests := []struct {
+		name         string
+		method       string
+		url          string
+		contentType  string
+		body         string
+		expectedCode int
+		expectedBody string
+		setupMock    func()
+	}{
+		{
+			name:         "Valid Batch Update",
+			method:       http.MethodPost,
+			url:          "/updates/",
+			contentType:  "application/json",
+			body:         `[{"id":"metric1","type":"gauge","value":123.45},{"id":"metric2","type":"counter","delta":100}]`,
+			expectedCode: http.StatusOK,
+			expectedBody: `[{"id":"metric1","type":"gauge","value":123.45},{"id":"metric2","type":"counter","delta":100}]`,
+			setupMock: func() {
+				mock.ExpectBegin()
+				mock.ExpectExec(`^INSERT INTO gauges`).WithArgs("metric1", 123.45).WillReturnResult(sqlmock.NewResult(1, 1))
+				mock.ExpectExec(`^INSERT INTO counters`).WithArgs("metric2", 100).WillReturnResult(sqlmock.NewResult(1, 1))
+				mock.ExpectCommit()
+
+				memStorage := storage.NewMemStorage("")
+				memStorage.SetGauge(context.Background(), "metric1", 123.45)
+				memStorage.AddCounter(context.Background(), "metric2", 100)
+				server.storage = memStorage
+			},
+		},
+		{
+			name:         "Empty Batch",
+			method:       http.MethodPost,
+			url:          "/updates/",
+			contentType:  "application/json",
+			body:         `[]`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: "Bad Request: empty metrics batch",
+			setupMock:    nil,
+		},
+		{
+			name:         "Invalid JSON",
+			method:       http.MethodPost,
+			url:          "/updates/",
+			contentType:  "application/json",
+			body:         `invalid json`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: "Bad Request: invalid JSON",
+			setupMock:    nil,
+		},
+		{
+			name:         "Invalid Metric in Batch",
+			method:       http.MethodPost,
+			url:          "/updates/",
+			contentType:  "application/json",
+			body:         `[{"id":"metric1","type":"invalid","value":123.45}]`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: "Bad Request: invalid metric type",
+			setupMock:    nil,
+		},
+		{
+			name:         "Database Error",
+			method:       http.MethodPost,
+			url:          "/updates/",
+			contentType:  "application/json",
+			body:         `[{"id":"metric1","type":"gauge","value":123.45}]`,
+			expectedCode: http.StatusInternalServerError,
+			expectedBody: "Internal Server Error",
+			setupMock: func() {
+				mock.ExpectBegin()
+				mock.ExpectExec(`^INSERT INTO gauges`).
+					WithArgs("metric1", 123.45).
+					WillReturnError(fmt.Errorf("database error"))
+				mock.ExpectRollback()
+			},
+		},
+		{
+			name:         "Without DB - Successful Update",
+			method:       http.MethodPost,
+			url:          "/updates/",
+			contentType:  "application/json",
+			body:         `[{"id":"metric1","type":"gauge","value":123.45}]`,
+			expectedCode: http.StatusOK,
+			expectedBody: `{"id":"metric1","type":"gauge","value":123.45}`,
+			setupMock: func() {
+				server.db = nil
+			},
+		},
+		{
+			name:         "Missing Gauge Value",
+			method:       http.MethodPost,
+			url:          "/updates/",
+			contentType:  "application/json",
+			body:         `[{"id":"metric1","type":"gauge"}]`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: "Bad Request: invalid metric type",
+			setupMock:    nil,
+		},
+		{
+			name:         "Missing Counter Delta",
+			method:       http.MethodPost,
+			url:          "/updates/",
+			contentType:  "application/json",
+			body:         `[{"id":"metric2","type":"counter"}]`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: "Bad Request: invalid metric type",
+			setupMock:    nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Reset storage and db before each test
+			memStorage = storage.NewMemStorage("")
+			server.storage = memStorage
+			server.db = db // Reset db in case previous test set it to nil
+
+			if tt.setupMock != nil {
+				tt.setupMock()
+			}
+
+			req := httptest.NewRequest(tt.method, tt.url, bytes.NewBufferString(tt.body))
+			req.Header.Set("Content-Type", tt.contentType)
+
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, req)
+
+			if w.Code != tt.expectedCode {
+				t.Errorf("Expected status code %d, got %d", tt.expectedCode, w.Code)
+			}
+
+			if tt.expectedBody != "" && !strings.Contains(w.Body.String(), tt.expectedBody) {
+				t.Errorf("Expected body to contain %q, got %q", tt.expectedBody, w.Body.String())
+			}
+		})
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
+
+//func TestServer_UpdateBatchMetrics(t *testing.T) {
+//	memStorage := storage.NewMemStorage("")
+//	handler := chi.NewRouter()
+//
+//	db, mock, err := sqlmock.New()
+//	if err != nil {
+//		t.Fatalf("failed to create mock database: %s", err)
+//	}
+//	defer db.Close()
+//
+//	server := &Server{
+//		storage: memStorage,
+//		db:      db,
+//	}
+//
+//	handler.Post("/updates/", server.UpdateBatchMetrics)
+//
+//	tests := []struct {
+//		name         string
+//		method       string
+//		url          string
+//		contentType  string
+//		body         string
+//		expectedCode int
+//		expectedBody string
+//		setupMock    func()
+//	}{
+//		{
+//			name:         "Valid Batch Update",
+//			method:       http.MethodPost,
+//			url:          "/updates/",
+//			contentType:  "application/json",
+//			body:         `[{"id":"metric1","type":"gauge","value":123.45},{"id":"metric2","type":"counter","delta":100}]`,
+//			expectedCode: http.StatusOK,
+//			expectedBody: `[{"id":"metric1","type":"gauge","value":123.45},{"id":"metric2","type":"counter","delta":100}]`,
+//			setupMock: func() {
+//				// Начинаем транзакцию
+//				mock.ExpectBegin()
+//
+//				// Ожидаем вставку gauge метрики
+//				mock.ExpectExec(`^INSERT INTO gauges \(name, value\) VALUES \(\$1, \$2\) ON CONFLICT \(name\) DO UPDATE SET value = EXCLUDED.value$`).
+//					WithArgs("metric1", 123.45).
+//					WillReturnResult(sqlmock.NewResult(1, 1))
+//
+//				// Ожидаем вставку counter метрики
+//				// (предполагая аналогичную структуру для counters)
+//				mock.ExpectExec(`^INSERT INTO counters \(name, value\) VALUES \(\$1, \$2\) ON CONFLICT \(name\) DO UPDATE SET value = counters.value \+ EXCLUDED.value$`).
+//					WithArgs("metric2", 100).
+//					WillReturnResult(sqlmock.NewResult(1, 1))
+//
+//				// Завершаем транзакцию
+//				mock.ExpectCommit()
+//			},
+//		},
+//		{
+//			name:         "Empty Batch",
+//			method:       http.MethodPost,
+//			url:          "/updates/",
+//			contentType:  "application/json",
+//			body:         `[]`,
+//			expectedCode: http.StatusBadRequest,
+//			expectedBody: "Bad Request: empty metrics batch",
+//			setupMock:    nil,
+//		},
+//		{
+//			name:         "Invalid JSON",
+//			method:       http.MethodPost,
+//			url:          "/updates/",
+//			contentType:  "application/json",
+//			body:         `invalid json`,
+//			expectedCode: http.StatusBadRequest,
+//			expectedBody: "Bad Request: invalid JSON",
+//			setupMock:    nil,
+//		},
+//		{
+//			name:         "Invalid Metric in Batch",
+//			method:       http.MethodPost,
+//			url:          "/updates/",
+//			contentType:  "application/json",
+//			body:         `[{"id":"metric1","type":"invalid","value":123.45}]`,
+//			expectedCode: http.StatusBadRequest,
+//			expectedBody: "bad Request: invalid metric type",
+//			setupMock:    nil,
+//		},
+//		{
+//			name:         "Unique Violation Error",
+//			method:       http.MethodPost,
+//			url:          "/updates/",
+//			contentType:  "application/json",
+//			body:         `[{"id":"metric1","type":"gauge","value":123.45}]`,
+//			expectedCode: http.StatusConflict,
+//			expectedBody: "Conflict: unique violation",
+//			setupMock: func() {
+//				mock.ExpectBegin()
+//				mock.ExpectExec("INSERT INTO metrics").
+//					WithArgs("metric1", "gauge", nil, sqlmock.AnyArg()).
+//					WillReturnError(&pq.Error{Code: pgerrcode.UniqueViolation})
+//				mock.ExpectRollback()
+//			},
+//		},
+//		{
+//			name:         "Database Error",
+//			method:       http.MethodPost,
+//			url:          "/updates/",
+//			contentType:  "application/json",
+//			body:         `[{"id":"metric1","type":"gauge","value":123.45}]`,
+//			expectedCode: http.StatusInternalServerError,
+//			expectedBody: "Internal Server Error",
+//			setupMock: func() {
+//				mock.ExpectBegin()
+//				mock.ExpectExec("INSERT INTO metrics").
+//					WithArgs("metric1", "gauge", nil, sqlmock.AnyArg()).
+//					WillReturnError(fmt.Errorf("database error"))
+//				mock.ExpectRollback()
+//			},
+//		},
+//		{
+//			name:         "Without DB - Successful Update",
+//			method:       http.MethodPost,
+//			url:          "/updates/",
+//			contentType:  "application/json",
+//			body:         `[{"id":"metric1","type":"gauge","value":123.45}]`,
+//			expectedCode: http.StatusOK,
+//			expectedBody: `{"id":"metric1","type":"gauge","value":123.45}`,
+//			setupMock: func() {
+//				server.db = nil
+//			},
+//		},
+//	}
+//
+//	for _, tt := range tests {
+//		t.Run(tt.name, func(t *testing.T) {
+//			memStorage = storage.NewMemStorage("")
+//			server.storage = memStorage
+//			server.db = db
+//
+//			if tt.setupMock != nil {
+//				tt.setupMock()
+//			}
+//
+//			req := httptest.NewRequest(tt.method, tt.url, bytes.NewBufferString(tt.body))
+//			req.Header.Set("Content-Type", tt.contentType)
+//
+//			w := httptest.NewRecorder()
+//			handler.ServeHTTP(w, req)
+//
+//			if w.Code != tt.expectedCode {
+//				t.Errorf("Expected status code %d, got %d", tt.expectedCode, w.Code)
+//			}
+//
+//			if !strings.Contains(w.Body.String(), tt.expectedBody) {
+//				t.Errorf("Expected body to contain %q, got %q", tt.expectedBody, w.Body.String())
+//			}
+//		})
+//	}
+//
+//	if err := mock.ExpectationsWereMet(); err != nil {
+//		t.Errorf("there were unfulfilled expectations: %s", err)
+//	}
+//}

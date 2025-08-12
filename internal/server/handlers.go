@@ -116,7 +116,7 @@ func (s *Server) UpdateBatchMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, metric := range metrics {
 		if err := validateMetric(metric); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			http.Error(w, "Bad Request: invalid metric type", http.StatusBadRequest)
 			return
 		}
 	}
@@ -133,7 +133,7 @@ func (s *Server) UpdateBatchMetrics(w http.ResponseWriter, r *http.Request) {
 			if s.storage.IsUniqueViolationError(err) {
 				http.Error(w, "Conflict: unique violation", http.StatusConflict)
 			} else {
-				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+				http.Error(w, "Error Internal Server Error (IsUniqueViolation)", http.StatusInternalServerError)
 			}
 			return
 		}
@@ -150,13 +150,13 @@ func (s *Server) UpdateBatchMetrics(w http.ResponseWriter, r *http.Request) {
 
 	updatedMetrics, err := s.getUpdatedMetrics(r.Context(), metrics)
 	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, "Internal Server Error (getUpdatedMetrics )", http.StatusInternalServerError)
 		return
 	}
 
 	jsonData, err := json.Marshal(updatedMetrics)
 	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, "Internal Server Error (getUpdatedMetrics )", http.StatusInternalServerError)
 		return
 	}
 

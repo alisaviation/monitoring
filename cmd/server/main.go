@@ -4,6 +4,7 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"net/http/pprof"
 	_ "net/http/pprof"
 	"os"
 
@@ -16,23 +17,25 @@ import (
 )
 
 func main() {
-	go func() {
-		log.Println(http.ListenAndServe("localhost:9090", nil))
-	}()
 	//go func() {
-	//	//mux := http.NewServeMux()
-	//	//mux.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
-	//	//mux.Handle("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
-	//	//mux.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
-	//	//mux.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
-	//	//mux.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
-	//	//
-	//	//server := &http.Server{
-	//	//	Addr:    "localhost:9090",
-	//	//	Handler: mux,
-	//	//}
-	//	log.Println(server.ListenAndServe())
+	//	log.Println(http.ListenAndServe("localhost:9090", nil))
 	//}()
+	go func() {
+		mux := http.NewServeMux()
+		mux.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
+		mux.Handle("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
+		mux.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
+		mux.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
+		mux.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
+		mux.Handle("/debug/pprof/heap", http.HandlerFunc(pprof.Handler("heap").ServeHTTP))
+		mux.Handle("/debug/pprof/goroutine", http.HandlerFunc(pprof.Handler("goroutine").ServeHTTP))
+
+		server := &http.Server{
+			Addr:    "localhost:9090",
+			Handler: mux,
+		}
+		log.Println(server.ListenAndServe())
+	}()
 
 	conf := config.SetConfigServer()
 	if len(flag.Args()) > 0 {
