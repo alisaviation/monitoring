@@ -1,3 +1,4 @@
+// Package collector implements system metrics collection functionality.
 package collector
 
 import (
@@ -11,21 +12,27 @@ import (
 	"github.com/alisaviation/monitoring/internal/models"
 )
 
+// MemStatsReader defines an interface for reading memory statistics.
 type MemStatsReader interface {
 	ReadMemStats(*runtime.MemStats)
 }
 
+// RealMemStatsReader provides a concrete implementation of MemStatsReader
+// that uses runtime.ReadMemStats.
 type RealMemStatsReader struct{}
 
+// ReadMemStats reads memory statistics into the provided MemStats struct.
 func (r *RealMemStatsReader) ReadMemStats(ms *runtime.MemStats) {
 	runtime.ReadMemStats(ms)
 }
 
+// Collector gathers system and application metrics.
 type Collector struct {
 	metrics map[string]*models.Metric
 	reader  MemStatsReader
 }
 
+// NewCollector creates a new Collector instance with initialized metrics.
 func NewCollector() *Collector {
 	c := &Collector{
 		metrics: make(map[string]*models.Metric),
@@ -80,6 +87,8 @@ func (c *Collector) initGopsutilMetrics() {
 	}
 }
 
+// CollectMetrics collects runtime memory statistics and returns them as metrics.
+// Returns a map of metric names to Metric structs.
 func (c *Collector) CollectMetrics() map[string]*models.Metric {
 	var memStats runtime.MemStats
 	c.reader.ReadMemStats(&memStats)
@@ -118,6 +127,9 @@ func (c *Collector) CollectMetrics() map[string]*models.Metric {
 	return c.metrics
 }
 
+// UpdateMetricsBuffer updates the metrics buffer with new metrics, handling counters specially.
+// For counters, it adds the new value to the existing value in the buffer.
+// For gauges, it replaces the existing value with the new one.
 func UpdateMetricsBuffer(metricsBuffer map[string]*models.Metric, metrics map[string]*models.Metric) {
 	for name, metric := range metrics {
 		if metric.MType == models.Counter {
@@ -138,6 +150,8 @@ func UpdateMetricsBuffer(metricsBuffer map[string]*models.Metric, metrics map[st
 	}
 }
 
+// СollectGopsutilMetrics collects system metrics using gopsutil library.
+// Returns a map of metric names to Metric structs.
 func (c *Collector) СollectGopsutilMetrics() map[string]*models.Metric {
 	if memStats, err := mem.VirtualMemory(); err == nil {
 		*c.metrics[models.TotalMemory].Value = float64(memStats.Total)

@@ -1,3 +1,6 @@
+// Package main provides the entry points for the monitoring agent and server applications.
+//
+// The server receives and stores metrics, providing HTTP endpoints for metric management.
 package main
 
 import (
@@ -17,9 +20,6 @@ import (
 )
 
 func main() {
-	//go func() {
-	//	log.Println(http.ListenAndServe("localhost:9090", nil))
-	//}()
 	go func() {
 		mux := http.NewServeMux()
 		mux.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
