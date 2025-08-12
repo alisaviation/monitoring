@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>sender - Go Documentation Server</title>
+
+<link type="text/css" rel="stylesheet" href="../../../../../../../lib/godoc/style.css">
+
+<script>window.initFuncs = [];</script>
+<script src="../../../../../../../lib/godoc/jquery.js" defer></script>
+
+
+
+<script>var goVersion = "go1.24.2";</script>
+<script src="../../../../../../../lib/godoc/godocs.js" defer></script>
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:8080/pkg/">Go Documentation Server</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:8080/pkg/">GoDoc</a></div>
+<a href="index.html#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+<form method="GET" action="http://localhost:8080/search">
+<div id="menu">
+
+<span class="search-box"><input type="search" id="search" name="q" placeholder="Search" aria-label="Search" required><button type="submit"><span><!-- magnifying glass: --><svg width="24" height="24" viewBox="0 0 24 24"><title>submit search</title><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/><path d="M0 0h24v24H0z" fill="none"/></svg></span></button></span>
+</div>
+</form>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Package sender
+    <span class="text-muted"></span>
+  </h1>
+
+
+
+
+
+
+
+<div id="nav"></div>
+
+
+<!--
+	Copyright 2009 The Go Authors. All rights reserved.
+	Use of this source code is governed by a BSD-style
+	license that can be found in the LICENSE file.
+-->
+<!--
+	Note: Static (i.e., not template-generated) href and id
+	attributes start with "pkg-" to make it impossible for
+	them to conflict with generated attributes (some of which
+	correspond to Go identifiers).
+-->
+
+	<script>
+	document.ANALYSIS_DATA = null;
+	document.CALLGRAPH = null;
+	</script>
+
+	
+		
+		<div id="short-nav">
+			<dl>
+			<dd><code>import "github.com/alisaviation/monitoring/internal/agent/sender"</code></dd>
+			</dl>
+			<dl>
+			<dd><a href="index.html#pkg-overview" class="overviewLink">Overview</a></dd>
+			<dd><a href="index.html#pkg-index" class="indexLink">Index</a></dd>
+			
+			
+			</dl>
+		</div>
+		<!-- The package's Name is printed as title by the top-level template -->
+		<div id="pkg-overview" class="toggleVisible">
+			<div class="collapsed">
+				<h2 class="toggleButton" title="Click to show Overview section">Overview ▹</h2>
+			</div>
+			<div class="expanded">
+				<h2 class="toggleButton" title="Click to hide Overview section">Overview ▾</h2>
+				<p>Package sender implements metrics sending functionality to the monitoring server.
+
+				
+			</div>
+		</div>
+
+		<div id="pkg-index" class="toggleVisible">
+		<div class="collapsed">
+			<h2 class="toggleButton" title="Click to show Index section">Index ▹</h2>
+		</div>
+		<div class="expanded">
+			<h2 class="toggleButton" title="Click to hide Index section">Index ▾</h2>
+
+		<!-- Table of contents for API; must be named manual-nav to turn off auto nav. -->
+			<div id="manual-nav">
+			<dl>
+			
+			
+				<dd><a href="index.html#pkg-variables">Variables</a></dd>
+			
+			
+			
+				
+				<dd><a href="index.html#Sender">type Sender</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#NewSender">func NewSender(serverAddress string, key string) *Sender</a></dd>
+				
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#Sender.SendMetricsBatch">func (s *Sender) SendMetricsBatch(ctx context.Context, metrics map[string]*models.Metric, key string) error</a></dd>
+				
+			
+				
+				<dd><a href="index.html#WorkerPool">type WorkerPool</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#NewWorkerPool">func NewWorkerPool(maxWorkers int) *WorkerPool</a></dd>
+				
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#WorkerPool.Submit">func (wp *WorkerPool) Submit(task func())</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="index.html#WorkerPool.Wait">func (wp *WorkerPool) Wait()</a></dd>
+				
+			
+			
+			</dl>
+			</div><!-- #manual-nav -->
+
+		
+
+		
+			<h3>Package files</h3>
+			<p>
+			<span style="font-size:90%">
+			
+				<a href="http://localhost:8080/src/github.com/alisaviation/monitoring/internal/agent/sender/sender.go">sender.go</a>
+			
+				<a href="http://localhost:8080/src/github.com/alisaviation/monitoring/internal/agent/sender/senderHelpers.go">senderHelpers.go</a>
+			
+			</span>
+			</p>
+		
+		</div><!-- .expanded -->
+		</div><!-- #pkg-index -->
+
+		
+
+		
+		
+			<h2 id="pkg-variables">Variables</h2>
+			
+				
+				<pre>var (
+    <span id="ErrMaxRetriesExceeded">ErrMaxRetriesExceeded</span> = <a href="http://localhost:8080/pkg/errors/">errors</a>.<a href="http://localhost:8080/pkg/errors/#New">New</a>(&#34;maximum retry attempts exceeded&#34;)
+    <span id="ErrNonRetriable">ErrNonRetriable</span>       = <a href="http://localhost:8080/pkg/errors/">errors</a>.<a href="http://localhost:8080/pkg/errors/#New">New</a>(&#34;non-retriable error occurred&#34;)
+    <span id="ErrEmptyBatch">ErrEmptyBatch</span>         = <a href="http://localhost:8080/pkg/errors/">errors</a>.<a href="http://localhost:8080/pkg/errors/#New">New</a>(&#34;metrics batch is empty&#34;)
+)</pre>
+			
+		
+		
+		
+			
+			
+			<h2 id="Sender">type <a href="http://localhost:8080/src/github.com/alisaviation/monitoring/internal/agent/sender/sender.go?s=369:464#L7">Sender</a>
+				<a class="permalink" href="index.html#Sender">&#xb6;</a>
+				
+				
+			</h2>
+			<p>Sender handles sending metrics to the monitoring server.
+
+			<pre>type Sender struct {
+    <span class="comment">// contains filtered or unexported fields</span>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="NewSender">func <a href="http://localhost:8080/src/github.com/alisaviation/monitoring/internal/agent/sender/sender.go?s=548:604#L14">NewSender</a>
+					<a class="permalink" href="index.html#NewSender">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func NewSender(serverAddress <a href="http://localhost:8080/pkg/builtin/#string">string</a>, key <a href="http://localhost:8080/pkg/builtin/#string">string</a>) *<a href="index.html#Sender">Sender</a></pre>
+				<p>NewSender creates a new Sender instance with the given server address and key.
+
+				
+				
+			
+
+			
+				
+				<h3 id="Sender.SendMetricsBatch">func (*Sender) <a href="http://localhost:8080/src/github.com/alisaviation/monitoring/internal/agent/sender/sender.go?s=1024:1131#L29">SendMetricsBatch</a>
+					<a class="permalink" href="index.html#Sender.SendMetricsBatch">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func (s *<a href="index.html#Sender">Sender</a>) SendMetricsBatch(ctx <a href="http://localhost:8080/pkg/context/">context</a>.<a href="http://localhost:8080/pkg/context/#Context">Context</a>, metrics map[<a href="http://localhost:8080/pkg/builtin/#string">string</a>]*<a href="../../models/index.html">models</a>.<a href="../../models/index.html#Metric">Metric</a>, key <a href="http://localhost:8080/pkg/builtin/#string">string</a>) <a href="http://localhost:8080/pkg/builtin/#error">error</a></pre>
+				<p>SendMetricsBatch sends a batch of metrics to the server in a single request.
+ctx is used for request cancellation.
+metrics contains the metrics to send.
+key is used for request signing.
+Returns an error if the send operation fails.
+
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="WorkerPool">type <a href="http://localhost:8080/src/github.com/alisaviation/monitoring/internal/agent/sender/senderHelpers.go?s=300:373#L12">WorkerPool</a>
+				<a class="permalink" href="index.html#WorkerPool">&#xb6;</a>
+				
+				
+			</h2>
+			
+			<pre>type WorkerPool struct {
+    <span class="comment">// contains filtered or unexported fields</span>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="NewWorkerPool">func <a href="http://localhost:8080/src/github.com/alisaviation/monitoring/internal/agent/sender/senderHelpers.go?s=375:421#L17">NewWorkerPool</a>
+					<a class="permalink" href="index.html#NewWorkerPool">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func NewWorkerPool(maxWorkers <a href="http://localhost:8080/pkg/builtin/#int">int</a>) *<a href="index.html#WorkerPool">WorkerPool</a></pre>
+				
+				
+				
+			
+
+			
+				
+				<h3 id="WorkerPool.Submit">func (*WorkerPool) <a href="http://localhost:8080/src/github.com/alisaviation/monitoring/internal/agent/sender/senderHelpers.go?s=495:536#L23">Submit</a>
+					<a class="permalink" href="index.html#WorkerPool.Submit">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func (wp *<a href="index.html#WorkerPool">WorkerPool</a>) Submit(task func())</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="WorkerPool.Wait">func (*WorkerPool) <a href="http://localhost:8080/src/github.com/alisaviation/monitoring/internal/agent/sender/senderHelpers.go?s=665:693#L33">Wait</a>
+					<a class="permalink" href="index.html#WorkerPool.Wait">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func (wp *<a href="index.html#WorkerPool">WorkerPool</a>) Wait()</pre>
+				
+				
+				
+				
+			
+		
+	
+
+	
+
+
+
+
+
+
+
+<div id="footer">
+Build version go1.24.2.<br>
+Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
+the content of this page is licensed under the
+Creative Commons Attribution 3.0 License,
+and code is licensed under a <a href="http://localhost:8080/LICENSE">BSD license</a>.<br>
+<a href="https://golang.org/doc/tos.html">Terms of Service</a> |
+<a href="https://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+</body>
+</html>

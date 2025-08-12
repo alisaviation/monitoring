@@ -17,13 +17,13 @@ type Agent struct {
 
 func SetConfigAgent() Agent {
 	var config Agent
-	config.ServerAddress = "localhost:8080"
+	config.ServerAddress = "doc"
 	config.PollInterval = 2 * time.Second
 	config.ReportInterval = 10 * time.Second
 	config.Key = ""
 	config.RateLimit = 5
 
-	address := flag.String("a", "localhost:8080", "HTTP server address")
+	address := flag.String("a", "doc", "HTTP server address")
 	poll := flag.Int64("p", 2, "Poll interval in seconds")
 	report := flag.Int64("r", 10, "Report interval in seconds")
 	key := flag.String("k", "", "Hash key")
@@ -72,7 +72,7 @@ type Server struct {
 
 func SetConfigServer() Server {
 	var config Server
-	config.ServerAddress = "localhost:8080"
+	config.ServerAddress = "doc"
 	config.StoreInterval = 300 * time.Second
 	config.FileStoragePath = "metrics.json"
 	config.Restore = true
@@ -82,7 +82,7 @@ func SetConfigServer() Server {
 	storeInt := flag.Int("i", 300, "Store interval in seconds")
 	filePath := flag.String("f", "metrics.json", "File storage path")
 	restore := flag.Bool("r", true, "Restore metrics from file")
-	address := flag.String("a", "localhost:8080", "HTTP server address")
+	address := flag.String("a", "doc", "HTTP server address")
 	databaseDSN := flag.String("d", "", "Database connection string (DSN)")
 	key := flag.String("k", "", "Hash key")
 
