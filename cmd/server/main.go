@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"net/http/pprof"
-	_ "net/http/pprof"
 	"os"
 
 	_ "github.com/lib/pq"
