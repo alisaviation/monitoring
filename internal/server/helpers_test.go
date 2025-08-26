@@ -348,11 +348,11 @@ func TestHandleRetry(t *testing.T) {
 	})
 
 	t.Run("Context canceled", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(ctx)
+		cancelCtx, cancel := context.WithCancel(ctx)
 		cancel()
 
 		start := time.Now()
-		err := server.handleRetry(ctx, 0, retryDelays, nil)
+		err := server.handleRetry(cancelCtx, 0, retryDelays, nil)
 		elapsed := time.Since(start)
 
 		require.Error(t, err)

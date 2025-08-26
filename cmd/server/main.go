@@ -8,17 +8,26 @@ import (
 	"log"
 	"net/http"
 	"net/http/pprof"
-	"os"
 
 	_ "github.com/lib/pq"
 	"go.uber.org/zap"
 
+	"github.com/alisaviation/monitoring/internal"
 	"github.com/alisaviation/monitoring/internal/config"
 	"github.com/alisaviation/monitoring/internal/logger"
 	"github.com/alisaviation/monitoring/internal/server"
 )
 
+// Build information variables set during compilation
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
 func main() {
+	internal.PrintBuildInfo(buildVersion, buildDate, buildCommit)
+
 	go func() {
 		mux := http.NewServeMux()
 		mux.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
@@ -39,16 +48,17 @@ func main() {
 	conf := config.SetConfigServer()
 	if len(flag.Args()) > 0 {
 		logger.Log.Fatal("Unknown flags", zap.Strings("flags", flag.Args()))
+		return
 	}
 
 	if err := logger.Initialize("info"); err != nil {
 		log.Fatalf("Error initializing logger: %v", err)
+		return
 	}
 	defer logger.Log.Sync()
 
 	app := server.NewServerApp(conf)
 	if err := app.Run(); err != nil {
 		logger.Log.Error("Application failed", zap.Error(err))
-		os.Exit(1)
 	}
 }

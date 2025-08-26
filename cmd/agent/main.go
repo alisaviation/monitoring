@@ -10,12 +10,22 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/alisaviation/monitoring/internal"
 	"github.com/alisaviation/monitoring/internal/agent"
 	"github.com/alisaviation/monitoring/internal/config"
 	"github.com/alisaviation/monitoring/internal/logger"
 )
 
+// Build information variables set during compilation
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
 func main() {
+	internal.PrintBuildInfo(buildVersion, buildDate, buildCommit)
+
 	go func() {
 		log.Println(http.ListenAndServe("localhost:8080", nil))
 	}()

@@ -1,3 +1,4 @@
+// Package config handles configuration management for both agent and server.
 package config
 
 import (

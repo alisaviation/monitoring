@@ -1,3 +1,4 @@
+// Package helpers provides utility functions used throughout the application.
 package helpers
 
 import (
