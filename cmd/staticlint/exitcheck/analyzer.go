@@ -27,7 +27,6 @@ var Analyzer = &analysis.Analyzer{
 func run(pass *analysis.Pass) (interface{}, error) {
 	inspect := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
 
-	// Check if this is the main package
 	if pass.Pkg.Name() != "main" {
 		return nil, nil
 	}
@@ -42,7 +41,6 @@ func run(pass *analysis.Pass) (interface{}, error) {
 			return true
 		}
 
-		// Check if we're inside the main function
 		var inMainFunc bool
 		for _, node := range stack {
 			if fd, ok := node.(*ast.FuncDecl); ok && fd.Name.Name == "main" {
@@ -55,7 +53,6 @@ func run(pass *analysis.Pass) (interface{}, error) {
 			return true
 		}
 
-		// Check for os.Exit calls
 		callExpr, ok := n.(*ast.CallExpr)
 		if !ok {
 			return true

@@ -63,7 +63,6 @@ import (
 
 func main() {
 	analyzers := []*analysis.Analyzer{
-		// Standard go vet analyzers (только самые важные)
 		assign.Analyzer,
 		atomic.Analyzer,
 		bools.Analyzer,
@@ -83,15 +82,11 @@ func main() {
 		tests.Analyzer,
 		unreachable.Analyzer,
 		unsafeptr.Analyzer,
-
-		// Custom exit check analyzer
 		exitcheck.Analyzer,
 	}
 
-	// Add selected SA-class analyzers from staticcheck (только некоторые)
 	for _, v := range staticcheck.Analyzers {
 		if len(v.Analyzer.Name) >= 2 && v.Analyzer.Name[0:2] == "SA" {
-			// Добавляем только некоторые SA анализаторы чтобы избежать проблем
 			switch v.Analyzer.Name {
 			case "SA1000", "SA1001", "SA1012", "SA1019", "SA4000", "SA4001", "SA5000", "SA5001":
 				analyzers = append(analyzers, v.Analyzer)
@@ -99,15 +94,9 @@ func main() {
 		}
 	}
 
-	// Add at least one analyzer from other staticcheck classes
 	analyzers = append(analyzers,
-		// From quickfix class
 		quickfix.Analyzers[0].Analyzer,
-
-		// From simple class
 		simple.Analyzers[0].Analyzer,
-
-		// From stylecheck class
 		stylecheck.Analyzers[0].Analyzer,
 	)
 
