@@ -1,3 +1,6 @@
+// Package agent implements the metrics collection and reporting functionality.
+//
+// The Agent collects system metrics at regular intervals and sends them to a monitoring server.
 package agent
 
 import (
@@ -17,6 +20,7 @@ import (
 	"github.com/alisaviation/monitoring/internal/models"
 )
 
+// Agent represents the metrics collection agent.
 type Agent struct {
 	config         config.Agent
 	collector      *collector.Collector
@@ -29,6 +33,7 @@ type Agent struct {
 	shutdownSignal chan struct{}
 }
 
+// NewAgent creates a new Agent instance with the given configuration.
 func NewAgent(conf config.Agent) *Agent {
 	return &Agent{
 		config:         conf,
@@ -36,11 +41,14 @@ func NewAgent(conf config.Agent) *Agent {
 		sender:         sender.NewSender(conf.ServerAddress, conf.Key),
 		workerPool:     sender.NewWorkerPool(conf.RateLimit),
 		metricsChan:    make(chan map[string]*models.Metric, conf.RateLimit*10),
-		metricsBuffer:  make(map[string]*models.Metric),
+		metricsBuffer:  make(map[string]*models.Metric, 100),
 		shutdownSignal: make(chan struct{}),
 	}
 }
 
+// Run starts the agent's metric collection and reporting processes.
+// It runs until a shutdown signal is received or the context is cancelled.
+// Returns an error if the agent fails to start.
 func (a *Agent) Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

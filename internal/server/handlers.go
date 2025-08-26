@@ -13,11 +13,13 @@ import (
 	"github.com/alisaviation/monitoring/internal/storage"
 )
 
+// Server provides HTTP endpoints for metric management.
 type Server struct {
 	storage storage.Storage
 	db      *sql.DB
 }
 
+// NewServer creates a new Server instance with the given storage and database connection.
 func NewServer(storage storage.Storage, db *sql.DB) *Server {
 	return &Server{
 		storage: storage,
@@ -25,7 +27,13 @@ func NewServer(storage storage.Storage, db *sql.DB) *Server {
 	}
 }
 
+// PingHandler handles requests to check database connectivity.
+// Responds with 200 OK if the database is reachable, 500 otherwise.
 func (s *Server) PingHandler(w http.ResponseWriter, r *http.Request) {
+	if s.db == nil {
+		http.Error(w, "Database not configured", http.StatusInternalServerError)
+		return
+	}
 
 	if err := s.db.PingContext(r.Context()); err != nil {
 		http.Error(w, "Database connection failed", http.StatusInternalServerError)
@@ -35,6 +43,8 @@ func (s *Server) PingHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// UpdateMetrics handles metric updates in either JSON or text format.
+// Supports both single metric updates and batch updates.
 func (s *Server) UpdateMetrics(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
 	key := middleware.GetKeyFromContext(r.Context())
@@ -48,6 +58,7 @@ func (s *Server) UpdateMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetValue retrieves a metric value in either JSON or text format.
 func (s *Server) GetValue(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
 	var response interface{}
@@ -97,6 +108,7 @@ func (s *Server) GetValue(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, response)
 }
 
+// UpdateBatchMetrics handles batch updates of multiple metrics in JSON format.
 func (s *Server) UpdateBatchMetrics(w http.ResponseWriter, r *http.Request) {
 	var metrics []models.Metric
 	key := middleware.GetKeyFromContext(r.Context())
@@ -112,7 +124,7 @@ func (s *Server) UpdateBatchMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, metric := range metrics {
 		if err := validateMetric(metric); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			http.Error(w, "Bad Request: invalid metric type", http.StatusBadRequest)
 			return
 		}
 	}
@@ -129,7 +141,7 @@ func (s *Server) UpdateBatchMetrics(w http.ResponseWriter, r *http.Request) {
 			if s.storage.IsUniqueViolationError(err) {
 				http.Error(w, "Conflict: unique violation", http.StatusConflict)
 			} else {
-				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+				http.Error(w, "Error Internal Server Error (IsUniqueViolation)", http.StatusInternalServerError)
 			}
 			return
 		}
@@ -146,13 +158,13 @@ func (s *Server) UpdateBatchMetrics(w http.ResponseWriter, r *http.Request) {
 
 	updatedMetrics, err := s.getUpdatedMetrics(r.Context(), metrics)
 	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, "Internal Server Error (getUpdatedMetrics )", http.StatusInternalServerError)
 		return
 	}
 
 	jsonData, err := json.Marshal(updatedMetrics)
 	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, "Internal Server Error (getUpdatedMetrics )", http.StatusInternalServerError)
 		return
 	}
 
@@ -161,6 +173,7 @@ func (s *Server) UpdateBatchMetrics(w http.ResponseWriter, r *http.Request) {
 	w.Write(jsonData)
 }
 
+// GetMetricsList returns an HTML page listing all stored metrics.
 func (s *Server) GetMetricsList(w http.ResponseWriter, r *http.Request) {
 	var response strings.Builder
 

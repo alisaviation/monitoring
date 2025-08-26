@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 var Log *zap.Logger = zap.NewNop()
@@ -15,14 +16,36 @@ func Initialize(level string) error {
 		return err
 	}
 
-	cfg := zap.NewProductionConfig()
-	cfg.Level = lvl
-	zl, err := cfg.Build()
+	cfg := zap.Config{
+		Level:       lvl,
+		Development: false,
+		Sampling:    nil,
+		Encoding:    "json",
+		EncoderConfig: zapcore.EncoderConfig{
+			TimeKey:        "ts",
+			LevelKey:       "level",
+			NameKey:        "logger",
+			CallerKey:      "caller",
+			FunctionKey:    zapcore.OmitKey,
+			MessageKey:     "msg",
+			StacktraceKey:  "stacktrace",
+			LineEnding:     zapcore.DefaultLineEnding,
+			EncodeLevel:    zapcore.LowercaseLevelEncoder,
+			EncodeTime:     zapcore.EpochTimeEncoder,
+			EncodeDuration: zapcore.StringDurationEncoder,
+			EncodeCaller:   zapcore.ShortCallerEncoder,
+		},
+		OutputPaths:      []string{"stderr"},
+		ErrorOutputPaths: []string{"stderr"},
+	}
+
+	Log, err = cfg.Build(
+		zap.AddStacktrace(zapcore.ErrorLevel),
+	)
 	if err != nil {
 		return err
 	}
 
-	Log = zl
 	return nil
 }
 
@@ -30,36 +53,38 @@ func RequestResponseLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
-		headers := make(map[string]string)
-		for k, v := range r.Header {
-			if len(v) > 0 {
-				headers[k] = v[0]
-			}
+		headers := make([]zap.Field, 0, 4)
+		if v := r.Header.Get("User-Agent"); v != "" {
+			headers = append(headers, zap.String("user_agent", v))
+		}
+		if v := r.Header.Get("X-Forwarded-For"); v != "" {
+			headers = append(headers, zap.String("x_forwarded_for", v))
+		}
+		if v := r.Header.Get("Content-Type"); v != "" {
+			headers = append(headers, zap.String("content_type", v))
 		}
 
-		ww := &responseWriter{ResponseWriter: w}
+		ww := &responseWriter{
+			ResponseWriter: w,
+			statusCode:     http.StatusOK,
+		}
+
 		next.ServeHTTP(ww, r)
 
 		duration := time.Since(start)
 
-		responseHeaders := make(map[string]string)
-		for k, v := range ww.Header() {
-			if len(v) > 0 {
-				responseHeaders[k] = v[0]
-			}
-		}
-
-		Log.Info("HTTP request handled",
+		fields := []zap.Field{
 			zap.String("method", r.Method),
 			zap.String("path", r.URL.Path),
 			zap.Int("status", ww.statusCode),
 			zap.Int("size", ww.size),
 			zap.Duration("duration", duration),
-			zap.Any("request_headers", headers),
-			zap.Any("response_headers", responseHeaders),
 			zap.String("hash_header", r.Header.Get("HashSHA256")),
 			zap.String("response_hash", ww.Header().Get("HashSHA256")),
-		)
+		}
+		fields = append(fields, headers...)
+
+		Log.Info("HTTP request", fields...)
 	})
 }
 

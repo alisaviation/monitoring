@@ -1,7 +1,10 @@
 package collector
 
 import (
+	"strconv"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/alisaviation/monitoring/internal/models"
 )
@@ -222,7 +225,57 @@ func TestUpdateMetricsBuffer(t *testing.T) {
 	}
 }
 
-// Helper functions to create pointers to float64 and int64
+func TestCollectGopsutilMetrics_RealValues(t *testing.T) {
+	metrics := map[string]*models.Metric{
+		models.TotalMemory: {ID: models.TotalMemory, MType: models.Gauge, Value: new(float64)},
+		models.FreeMemory:  {ID: models.FreeMemory, MType: models.Gauge, Value: new(float64)},
+	}
+
+	for i := 1; i <= 32; i++ {
+		name := models.CPUutilization + strconv.Itoa(i)
+		metrics[name] = &models.Metric{
+			ID:    name,
+			MType: models.Gauge,
+			Value: new(float64),
+		}
+	}
+
+	collector := &Collector{
+		metrics: metrics,
+	}
+
+	result := collector.СollectGopsutilMetrics()
+	assert.NotNil(t, result, "Result should not be nil")
+
+	t.Run("Memory metrics", func(t *testing.T) {
+		assert.Greater(t, *result[models.TotalMemory].Value, 0.0,
+			"Total memory should be greater than 0")
+		assert.GreaterOrEqual(t, *result[models.TotalMemory].Value,
+			*result[models.FreeMemory].Value,
+			"Total memory should be >= free memory")
+		assert.GreaterOrEqual(t, *result[models.FreeMemory].Value, 0.0,
+			"Free memory should be >= 0")
+	})
+
+	t.Run("CPU metrics", func(t *testing.T) {
+		hasNonZeroCPU := false
+		for name, metric := range result {
+			if len(name) > len(models.CPUutilization) &&
+				name[:len(models.CPUutilization)] == models.CPUutilization {
+				assert.GreaterOrEqual(t, *metric.Value, 0.0,
+					"CPU utilization should be >= 0")
+				assert.LessOrEqual(t, *metric.Value, 100.0,
+					"CPU utilization should be <= 100")
+
+				if *metric.Value > 0 {
+					hasNonZeroCPU = true
+				}
+			}
+		}
+		assert.True(t, hasNonZeroCPU, "At least one CPU metric should have non-zero value")
+	})
+}
+
 func float64Ptr(v float64) *float64 {
 	return &v
 }

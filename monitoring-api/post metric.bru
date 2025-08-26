@@ -5,7 +5,7 @@ meta {
 }
 
 post {
-  url: http://localhost:8080/update/
+  url: http://localhost:8080/updates/
   body: json
   auth: none
 }
@@ -13,8 +13,9 @@ post {
 headers {
   Content-Length: 0
   Content-Type: application/json
-  Content-Encoding: gzip
-  ~Accept-Encoding: gzip
+  Accept-Encoding: gzip
+  Key: key
+  ~Content-Encoding: gzip
 }
 
 body:json {

@@ -1,3 +1,4 @@
+// Package server implements the monitoring server that receives and stores metrics.
 package server
 
 import (
@@ -21,6 +22,8 @@ import (
 	"github.com/alisaviation/monitoring/internal/storage"
 )
 
+// ServerApp represents the main server application.
+// It manages the HTTP server, storage backend, and application lifecycle.
 type ServerApp struct {
 	config         config.Server
 	storage        storage.Storage
@@ -31,6 +34,7 @@ type ServerApp struct {
 	mu             sync.RWMutex
 }
 
+// NewServerApp creates a new ServerApp instance with the given configuration.
 func NewServerApp(conf config.Server) *ServerApp {
 	return &ServerApp{
 		config:         conf,
@@ -38,6 +42,9 @@ func NewServerApp(conf config.Server) *ServerApp {
 	}
 }
 
+// Run starts the server application.
+// It initializes storage, starts the HTTP server, and handles shutdown signals.
+// Returns an error if the application fails to start.
 func (s *ServerApp) Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

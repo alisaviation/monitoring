@@ -1,7 +1,12 @@
+// Package main provides the entry points for the monitoring agent and server applications.
+//
+// The agent collects system and application metrics and sends them to the server.
 package main
 
 import (
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 
 	"go.uber.org/zap"
@@ -12,6 +17,10 @@ import (
 )
 
 func main() {
+	go func() {
+		log.Println(http.ListenAndServe("localhost:8080", nil))
+	}()
+
 	conf := config.SetConfigAgent()
 
 	if err := logger.Initialize("info"); err != nil {

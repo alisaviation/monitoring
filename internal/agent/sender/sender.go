@@ -1,3 +1,4 @@
+// Package sender implements metrics sending functionality to the monitoring server.
 package sender
 
 import (
@@ -12,12 +13,14 @@ import (
 	"github.com/alisaviation/monitoring/internal/models"
 )
 
+// Sender handles sending metrics to the monitoring server.
 type Sender struct {
 	serverAddress string
 	client        *resty.Client
 	key           string
 }
 
+// NewSender creates a new Sender instance with the given server address and key.
 func NewSender(serverAddress string, key string) *Sender {
 	client := resty.New()
 	client.SetHeader("Accept-Encoding", "gzip")
@@ -28,6 +31,11 @@ func NewSender(serverAddress string, key string) *Sender {
 	}
 }
 
+// SendMetricsBatch sends a batch of metrics to the server in a single request.
+// ctx is used for request cancellation.
+// metrics contains the metrics to send.
+// key is used for request signing.
+// Returns an error if the send operation fails.
 func (s *Sender) SendMetricsBatch(ctx context.Context, metrics map[string]*models.Metric, key string) error {
 	if len(metrics) == 0 {
 		logger.Log.Warn("Error, the batch is empty")
