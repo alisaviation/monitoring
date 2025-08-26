@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	_ "net/http/pprof"
-	"os"
 
 	"go.uber.org/zap"
 
@@ -31,7 +30,5 @@ func main() {
 	agentInstance := agent.NewAgent(conf)
 	if err := agentInstance.Run(); err != nil {
 		logger.Log.Error("Agent failed", zap.Error(err))
-		os.Exit(1)
 	}
-
 }
