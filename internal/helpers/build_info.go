@@ -26,17 +26,16 @@ import (
 //
 //	PrintBuildInfo(version, date, commit)
 func PrintBuildInfo(buildVersion string, buildDate string, buildCommit string) {
-	if buildVersion == "" {
-		buildVersion = "N/A"
-	}
-	if buildDate == "" {
-		buildDate = "N/A"
-	}
-	if buildCommit == "" {
-		buildCommit = "N/A"
+	fields := map[string]string{
+		"Build version": buildVersion,
+		"Build date":    buildDate,
+		"Build commit":  buildCommit,
 	}
 
-	fmt.Printf("Build version: %s\n", buildVersion)
-	fmt.Printf("Build date: %s\n", buildDate)
-	fmt.Printf("Build commit: %s\n", buildCommit)
+	for key, value := range fields {
+		if value == "" {
+			value = "N/A"
+		}
+		fmt.Printf("%s: %s\n", key, value)
+	}
 }

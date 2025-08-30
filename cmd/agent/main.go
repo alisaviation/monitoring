@@ -5,14 +5,13 @@ package main
 
 import (
 	"log"
-	"net/http"
 	_ "net/http/pprof"
 
 	"go.uber.org/zap"
 
-	"github.com/alisaviation/monitoring/internal"
 	"github.com/alisaviation/monitoring/internal/agent"
 	"github.com/alisaviation/monitoring/internal/config"
+	"github.com/alisaviation/monitoring/internal/helpers"
 	"github.com/alisaviation/monitoring/internal/logger"
 )
 
@@ -24,11 +23,8 @@ var (
 )
 
 func main() {
-	internal.PrintBuildInfo(buildVersion, buildDate, buildCommit)
-
-	go func() {
-		log.Println(http.ListenAndServe("localhost:8080", nil))
-	}()
+	helpers.PrintBuildInfo(buildVersion, buildDate, buildCommit)
+	helpers.StartPProfServer("localhost:8080")
 
 	conf := config.SetConfigAgent()
 
