@@ -1,6 +1,6 @@
 // Package internal provides internal utilities and shared functionality
 // for the monitoring application.
-package internal
+package helpers
 
 import (
 	"fmt"
