@@ -75,6 +75,7 @@ func (s *ServerApp) Run() error {
 	if err := s.startHTTPServer(); err != nil {
 		return err
 	}
+
 	select {
 	case <-s.shutdownSignal:
 		logger.Log.Info("Shutdown signal received")
@@ -82,7 +83,6 @@ func (s *ServerApp) Run() error {
 		logger.Log.Info("Context cancelled")
 	}
 
-	//s.wg.Wait()
 	s.shutdown(ctx)
 	logger.Log.Info("Server shutdown complete")
 	return nil
@@ -165,12 +165,12 @@ func (s *ServerApp) saveMetrics() {
 
 func (s *ServerApp) handleSignals(cancel context.CancelFunc) {
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	sig := <-sigChan
 	logger.Log.Info("Received signal", zap.String("signal", sig.String()))
-	cancel()
 	close(s.shutdownSignal)
+	cancel()
 }
 
 func (s *ServerApp) startHTTPServer() error {
@@ -211,6 +211,7 @@ func (s *ServerApp) startHTTPServer() error {
 
 func (s *ServerApp) shutdown(ctx context.Context) {
 	if s.config.StoreInterval > 0 && s.storage != nil {
+		logger.Log.Info("Saving final metrics before shutdown")
 		s.saveMetrics()
 	}
 
@@ -220,6 +221,8 @@ func (s *ServerApp) shutdown(ctx context.Context) {
 
 		if err := s.httpServer.Shutdown(shutdownCtx); err != nil {
 			logger.Log.Error("HTTP server shutdown failed", zap.Error(err))
+		} else {
+			logger.Log.Info("HTTP server stopped successfully")
 		}
 	}
 

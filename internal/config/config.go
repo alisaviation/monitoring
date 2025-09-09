@@ -154,7 +154,7 @@ func SetConfigServer() Server {
 	flag.Parse()
 
 	defaultConfig := Server{
-		ServerAddress:   "localhost:8787",
+		ServerAddress:   "localhost:8080",
 		StoreInterval:   300 * time.Second,
 		FileStoragePath: "metrics.json",
 		Restore:         true,

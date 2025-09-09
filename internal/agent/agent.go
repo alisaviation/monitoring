@@ -77,18 +77,22 @@ func (a *Agent) Run() error {
 	case <-ctx.Done():
 		logger.Log.Info("Context cancelled")
 	}
+
 	a.wg.Wait()
 	a.workerPool.Wait()
-	logger.Log.Info("Shutting down agent")
+	close(a.metricsChan)
+	logger.Log.Info("Agent shutdown complete")
+
 	return nil
 }
 
 func (a *Agent) handleSignals(cancel context.CancelFunc) {
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	sig := <-sigChan
 	logger.Log.Info("Received signal, agent is shutting down...", zap.String("signal", sig.String()))
+	close(a.shutdownSignal)
 	cancel()
 }
 
@@ -157,7 +161,16 @@ func (a *Agent) runMetricsProcessor(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			for {
+				select {
+				case metrics := <-a.metricsChan:
+					a.bufferMutex.Lock()
+					collector.UpdateMetricsBuffer(a.metricsBuffer, metrics)
+					a.bufferMutex.Unlock()
+				default:
+					return
+				}
+			}
 		case metrics := <-a.metricsChan:
 			a.bufferMutex.Lock()
 			collector.UpdateMetricsBuffer(a.metricsBuffer, metrics)
@@ -217,9 +230,19 @@ func (a *Agent) sendRemainingMetrics(ctx context.Context) {
 	logger.Log.Info("Sending remaining metrics before shutdown",
 		zap.Int("count", len(a.metricsBuffer)))
 
+	sendCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	var sendWg sync.WaitGroup
+	sendWg.Add(1)
+
 	a.workerPool.Submit(func() {
-		if err := a.sender.SendMetricsBatch(ctx, a.metricsBuffer, a.config.Key); err != nil {
+		defer sendWg.Done()
+		if err := a.sender.SendMetricsBatch(sendCtx, a.metricsBuffer, a.config.Key); err != nil {
 			logger.Log.Error("Failed to send final metrics batch", zap.Error(err))
+		} else {
+			logger.Log.Info("Final metrics batch sent successfully")
 		}
 	})
+	sendWg.Wait()
 }
