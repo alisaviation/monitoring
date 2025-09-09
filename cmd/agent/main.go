@@ -24,7 +24,7 @@ var (
 
 func main() {
 	helpers.PrintBuildInfo(buildVersion, buildDate, buildCommit)
-	helpers.StartPProfServer("localhost:8080")
+	helpers.StartPProfServer("localhost:8181")
 
 	conf := config.SetConfigAgent()
 

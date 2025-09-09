@@ -14,6 +14,7 @@ type Agent struct {
 	ReportInterval time.Duration
 	Key            string
 	RateLimit      int
+	CryptoKey      string
 }
 
 func SetConfigAgent() Agent {
@@ -23,12 +24,14 @@ func SetConfigAgent() Agent {
 	config.ReportInterval = 10 * time.Second
 	config.Key = ""
 	config.RateLimit = 5
+	config.CryptoKey = ""
 
 	address := flag.String("a", "localhost:8080", "HTTP server address")
 	poll := flag.Int64("p", 2, "Poll interval in seconds")
 	report := flag.Int64("r", 10, "Report interval in seconds")
 	key := flag.String("k", "", "Hash key")
 	limit := flag.Int("l", 5, "Rate limit")
+	cryptoKey := flag.String("crypto-key", "", "Path to public key for encryption")
 
 	flag.Parse()
 	config.ServerAddress = *address
@@ -36,6 +39,7 @@ func SetConfigAgent() Agent {
 	config.ReportInterval = time.Duration(*report) * time.Second
 	config.Key = *key
 	config.RateLimit = *limit
+	config.CryptoKey = *cryptoKey
 
 	if envAddress := os.Getenv("ADDRESS"); envAddress != "" {
 		config.ServerAddress = envAddress
@@ -58,6 +62,9 @@ func SetConfigAgent() Agent {
 			config.RateLimit = ratelimit
 		}
 	}
+	if envCryptoKey := os.Getenv("CRYPTO_KEY"); envCryptoKey != "" {
+		config.CryptoKey = envCryptoKey
+	}
 
 	return config
 }
@@ -69,6 +76,7 @@ type Server struct {
 	Restore         bool
 	DatabaseDSN     string
 	Key             string
+	CryptoKey       string
 }
 
 func SetConfigServer() Server {
@@ -79,6 +87,7 @@ func SetConfigServer() Server {
 	config.Restore = true
 	config.DatabaseDSN = ""
 	config.Key = ""
+	config.CryptoKey = ""
 
 	storeInt := flag.Int("i", 300, "Store interval in seconds")
 	filePath := flag.String("f", "metrics.json", "File storage path")
@@ -86,6 +95,7 @@ func SetConfigServer() Server {
 	address := flag.String("a", "localhost:8080", "HTTP server address")
 	databaseDSN := flag.String("d", "", "Database connection string (DSN)")
 	key := flag.String("k", "", "Hash key")
+	cryptoKey := flag.String("crypto-key", "", "Path to private key for decryption")
 
 	flag.Parse()
 
@@ -95,6 +105,7 @@ func SetConfigServer() Server {
 	config.Restore = *restore
 	config.DatabaseDSN = *databaseDSN
 	config.Key = *key
+	config.CryptoKey = *cryptoKey
 
 	if envAddress := os.Getenv("ADDRESS"); envAddress != "" {
 		config.ServerAddress = envAddress
@@ -117,6 +128,9 @@ func SetConfigServer() Server {
 	}
 	if envKey := os.Getenv("KEY"); envKey != "" {
 		config.Key = envKey
+	}
+	if envCryptoKey := os.Getenv("CRYPTO_KEY"); envCryptoKey != "" {
+		config.CryptoKey = envCryptoKey
 	}
 
 	return config

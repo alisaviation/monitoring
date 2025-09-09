@@ -3,6 +3,7 @@ package server
 
 import (
 	"context"
+	"crypto/rsa"
 	"database/sql"
 	"errors"
 	"net/http"
@@ -32,13 +33,30 @@ type ServerApp struct {
 	shutdownSignal chan struct{}
 	wg             sync.WaitGroup
 	mu             sync.RWMutex
+	privateKey     *rsa.PrivateKey
 }
 
 // NewServerApp creates a new ServerApp instance with the given configuration.
 func NewServerApp(conf config.Server) *ServerApp {
+	var privateKey *rsa.PrivateKey
+	var err error
+
+	if conf.CryptoKey != "" {
+		privateKey, err = helpers.LoadPrivateKey(conf.CryptoKey)
+		if err != nil {
+			logger.Log.Error("Failed to load private key",
+				zap.String("path", conf.CryptoKey),
+				zap.Error(err))
+		} else {
+			logger.Log.Info("Private key loaded successfully",
+				zap.String("path", conf.CryptoKey))
+		}
+	}
+
 	return &ServerApp{
 		config:         conf,
 		shutdownSignal: make(chan struct{}),
+		privateKey:     privateKey,
 	}
 }
 
@@ -164,6 +182,7 @@ func (s *ServerApp) startHTTPServer() error {
 		logger.RequestResponseLogger,
 		middleware.GzipMiddleware,
 		middleware.SyncSaveMiddleware(s.config.StoreInterval, s.storage),
+		middleware.DecryptMiddleware(s.privateKey),
 	)
 	if s.config.Key != "" {
 		r.Use(

@@ -5,6 +5,7 @@ package agent
 
 import (
 	"context"
+	"crypto/rsa"
 	"os"
 	"os/signal"
 	"sync"
@@ -16,6 +17,7 @@ import (
 	"github.com/alisaviation/monitoring/internal/agent/collector"
 	"github.com/alisaviation/monitoring/internal/agent/sender"
 	"github.com/alisaviation/monitoring/internal/config"
+	"github.com/alisaviation/monitoring/internal/helpers"
 	"github.com/alisaviation/monitoring/internal/logger"
 	"github.com/alisaviation/monitoring/internal/models"
 )
@@ -31,18 +33,31 @@ type Agent struct {
 	bufferMutex    sync.Mutex
 	wg             sync.WaitGroup
 	shutdownSignal chan struct{}
+	publicKey      *rsa.PublicKey
 }
 
 // NewAgent creates a new Agent instance with the given configuration.
 func NewAgent(conf config.Agent) *Agent {
+	var publicKey *rsa.PublicKey
+	var err error
+
+	if conf.CryptoKey != "" {
+		publicKey, err = helpers.LoadPublicKey(conf.CryptoKey)
+		if err != nil {
+			logger.Log.Error("Failed to load public key", zap.Error(err))
+		} else {
+			logger.Log.Info("Public key loaded successfully")
+		}
+	}
 	return &Agent{
 		config:         conf,
 		collector:      collector.NewCollector(),
-		sender:         sender.NewSender(conf.ServerAddress, conf.Key),
+		sender:         sender.NewSender(conf.ServerAddress, conf.Key, publicKey),
 		workerPool:     sender.NewWorkerPool(conf.RateLimit),
 		metricsChan:    make(chan map[string]*models.Metric, conf.RateLimit*10),
 		metricsBuffer:  make(map[string]*models.Metric, 100),
 		shutdownSignal: make(chan struct{}),
+		publicKey:      publicKey,
 	}
 }
 

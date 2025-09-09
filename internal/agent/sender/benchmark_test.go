@@ -9,7 +9,7 @@ import (
 )
 
 func BenchmarkSendMetricsBatch(b *testing.B) {
-	s := NewSender("http://localhost:8080", "")
+	s := NewSender("http://localhost:8080", "", nil)
 	metrics := make(map[string]*models.Metric)
 
 	for i := 0; i < 100; i++ {
