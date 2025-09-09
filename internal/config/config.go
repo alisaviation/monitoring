@@ -3,6 +3,7 @@ package config
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"strconv"
 	"time"
@@ -19,13 +20,10 @@ type Agent struct {
 
 func SetConfigAgent() Agent {
 	var config Agent
-	config.ServerAddress = "localhost:8080"
-	config.PollInterval = 2 * time.Second
-	config.ReportInterval = 10 * time.Second
-	config.Key = ""
-	config.RateLimit = 5
-	config.CryptoKey = ""
+	var configFile string
 
+	flag.StringVar(&configFile, "c", "", "Path to config file")
+	flag.StringVar(&configFile, "config", "", "Path to config file")
 	address := flag.String("a", "localhost:8080", "HTTP server address")
 	poll := flag.Int64("p", 2, "Poll interval in seconds")
 	report := flag.Int64("r", 10, "Report interval in seconds")
@@ -34,6 +32,43 @@ func SetConfigAgent() Agent {
 	cryptoKey := flag.String("crypto-key", "", "Path to public key for encryption")
 
 	flag.Parse()
+
+	defaultConfig := Agent{
+		ServerAddress:  "localhost:8080",
+		PollInterval:   2 * time.Second,
+		ReportInterval: 10 * time.Second,
+		Key:            "",
+		RateLimit:      5,
+		CryptoKey:      "",
+	}
+
+	config = defaultConfig
+	if configFile != "" {
+		var fileConfig AgentConfig
+		if err := loadConfigFromFile(configFile, &fileConfig); err != nil {
+			fmt.Printf("Warning: failed to load config file: %v\n", err)
+		} else {
+			if fileConfig.Address != "" {
+				config.ServerAddress = fileConfig.Address
+			}
+			if fileConfig.PollInterval != "" {
+				config.PollInterval = parseDuration(fileConfig.PollInterval, defaultConfig.PollInterval)
+			}
+			if fileConfig.ReportInterval != "" {
+				config.ReportInterval = parseDuration(fileConfig.ReportInterval, defaultConfig.ReportInterval)
+			}
+			if fileConfig.Key != "" {
+				config.Key = fileConfig.Key
+			}
+			if fileConfig.RateLimit > 0 {
+				config.RateLimit = fileConfig.RateLimit
+			}
+			if fileConfig.CryptoKey != "" {
+				config.CryptoKey = fileConfig.CryptoKey
+			}
+		}
+	}
+
 	config.ServerAddress = *address
 	config.PollInterval = time.Duration(*poll) * time.Second
 	config.ReportInterval = time.Duration(*report) * time.Second
@@ -65,6 +100,30 @@ func SetConfigAgent() Agent {
 	if envCryptoKey := os.Getenv("CRYPTO_KEY"); envCryptoKey != "" {
 		config.CryptoKey = envCryptoKey
 	}
+	if envConfigFile := os.Getenv("CONFIG"); envConfigFile != "" {
+		configFile = envConfigFile
+		var fileConfig AgentConfig
+		if err := loadConfigFromFile(configFile, &fileConfig); err == nil {
+			if config.ServerAddress == "localhost:8080" && fileConfig.Address != "" {
+				config.ServerAddress = fileConfig.Address
+			}
+			if config.PollInterval == 2*time.Second && fileConfig.PollInterval != "" {
+				config.PollInterval = parseDuration(fileConfig.PollInterval, config.PollInterval)
+			}
+			if config.ReportInterval == 10*time.Second && fileConfig.ReportInterval != "" {
+				config.ReportInterval = parseDuration(fileConfig.ReportInterval, config.ReportInterval)
+			}
+			if config.Key == "" && fileConfig.Key != "" {
+				config.Key = fileConfig.Key
+			}
+			if config.RateLimit == 5 && fileConfig.RateLimit > 0 {
+				config.RateLimit = fileConfig.RateLimit
+			}
+			if config.CryptoKey == "" && fileConfig.CryptoKey != "" {
+				config.CryptoKey = fileConfig.CryptoKey
+			}
+		}
+	}
 
 	return config
 }
@@ -81,14 +140,10 @@ type Server struct {
 
 func SetConfigServer() Server {
 	var config Server
-	config.ServerAddress = "localhost:8080"
-	config.StoreInterval = 300 * time.Second
-	config.FileStoragePath = "metrics.json"
-	config.Restore = true
-	config.DatabaseDSN = ""
-	config.Key = ""
-	config.CryptoKey = ""
+	var configFile string
 
+	flag.StringVar(&configFile, "c", "", "Path to config file")
+	flag.StringVar(&configFile, "config", "", "Path to config file")
 	storeInt := flag.Int("i", 300, "Store interval in seconds")
 	filePath := flag.String("f", "metrics.json", "File storage path")
 	restore := flag.Bool("r", true, "Restore metrics from file")
@@ -96,8 +151,45 @@ func SetConfigServer() Server {
 	databaseDSN := flag.String("d", "", "Database connection string (DSN)")
 	key := flag.String("k", "", "Hash key")
 	cryptoKey := flag.String("crypto-key", "", "Path to private key for decryption")
-
 	flag.Parse()
+
+	defaultConfig := Server{
+		ServerAddress:   "localhost:8787",
+		StoreInterval:   300 * time.Second,
+		FileStoragePath: "metrics.json",
+		Restore:         true,
+		DatabaseDSN:     "",
+		Key:             "",
+		CryptoKey:       "",
+	}
+
+	config = defaultConfig
+	if configFile != "" {
+		var fileConfig ServerConfig
+		if err := loadConfigFromFile(configFile, &fileConfig); err != nil {
+			fmt.Printf("Warning: failed to load config file: %v\n", err)
+		} else {
+			if fileConfig.Address != "" {
+				config.ServerAddress = fileConfig.Address
+			}
+			if fileConfig.StoreInterval != "" {
+				config.StoreInterval = parseDuration(fileConfig.StoreInterval, defaultConfig.StoreInterval)
+			}
+			if fileConfig.StoreFile != "" {
+				config.FileStoragePath = fileConfig.StoreFile
+			}
+			if fileConfig.DatabaseDSN != "" {
+				config.DatabaseDSN = fileConfig.DatabaseDSN
+			}
+			if fileConfig.Key != "" {
+				config.Key = fileConfig.Key
+			}
+			if fileConfig.CryptoKey != "" {
+				config.CryptoKey = fileConfig.CryptoKey
+			}
+			config.Restore = fileConfig.Restore
+		}
+	}
 
 	config.ServerAddress = *address
 	config.StoreInterval = time.Duration(*storeInt) * time.Second
@@ -131,6 +223,33 @@ func SetConfigServer() Server {
 	}
 	if envCryptoKey := os.Getenv("CRYPTO_KEY"); envCryptoKey != "" {
 		config.CryptoKey = envCryptoKey
+	}
+	if envConfigFile := os.Getenv("CONFIG"); envConfigFile != "" {
+		configFile = envConfigFile
+		var fileConfig ServerConfig
+		if err := loadConfigFromFile(configFile, &fileConfig); err == nil {
+			if config.ServerAddress == "localhost:8080" && fileConfig.Address != "" {
+				config.ServerAddress = fileConfig.Address
+			}
+			if config.StoreInterval == 300*time.Second && fileConfig.StoreInterval != "" {
+				config.StoreInterval = parseDuration(fileConfig.StoreInterval, config.StoreInterval)
+			}
+			if config.FileStoragePath == "metrics.json" && fileConfig.StoreFile != "" {
+				config.FileStoragePath = fileConfig.StoreFile
+			}
+			if config.DatabaseDSN == "" && fileConfig.DatabaseDSN != "" {
+				config.DatabaseDSN = fileConfig.DatabaseDSN
+			}
+			if config.Key == "" && fileConfig.Key != "" {
+				config.Key = fileConfig.Key
+			}
+			if config.CryptoKey == "" && fileConfig.CryptoKey != "" {
+				config.CryptoKey = fileConfig.CryptoKey
+			}
+			if config.Restore && !fileConfig.Restore {
+				config.Restore = fileConfig.Restore
+			}
+		}
 	}
 
 	return config
