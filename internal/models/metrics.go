@@ -1,3 +1,5 @@
+// Package models defines data structures used for metrics representation
+// and communication between agent and server components.
 package models
 
 const (

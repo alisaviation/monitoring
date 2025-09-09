@@ -722,7 +722,7 @@ func Test_UpdateBatchMetrics(t *testing.T) {
 				mock.ExpectExec(`^INSERT INTO counters`).WithArgs("metric2", 100).WillReturnResult(sqlmock.NewResult(1, 1))
 				mock.ExpectCommit()
 
-				memStorage := storage.NewMemStorage("")
+				memStorage = storage.NewMemStorage("")
 				memStorage.SetGauge(context.Background(), "metric1", 123.45)
 				memStorage.AddCounter(context.Background(), "metric2", 100)
 				server.storage = memStorage

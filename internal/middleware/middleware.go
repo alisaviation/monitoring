@@ -1,3 +1,4 @@
+// Package middleware provides HTTP middleware functions for the server.
 package middleware
 
 import (
