@@ -76,31 +76,31 @@ func SetConfigAgent() Agent {
 	config.RateLimit = *limit
 	config.CryptoKey = *cryptoKey
 
-	if envAddress := os.Getenv("ADDRESS"); envAddress != "" {
+	if envAddress, exists := os.LookupEnv("ADDRESS"); exists {
 		config.ServerAddress = envAddress
 	}
-	if envReportInterval := os.Getenv("REPORT_INTERVAL"); envReportInterval != "" {
+	if envReportInterval, exists := os.LookupEnv("REPORT_INTERVAL"); exists {
 		if reportInterval, err := strconv.Atoi(envReportInterval); err == nil {
 			config.ReportInterval = time.Duration(reportInterval) * time.Second
 		}
 	}
-	if envPollInterval := os.Getenv("POLL_INTERVAL"); envPollInterval != "" {
+	if envPollInterval, exists := os.LookupEnv("POLL_INTERVAL"); exists {
 		if pollInterval, err := strconv.Atoi(envPollInterval); err == nil {
 			config.PollInterval = time.Duration(pollInterval) * time.Second
 		}
 	}
-	if envKey := os.Getenv("KEY"); envKey != "" {
+	if envKey, exists := os.LookupEnv("KEY"); exists {
 		config.Key = envKey
 	}
-	if envLimit := os.Getenv("RATE_LIMIT"); envLimit != "" {
+	if envLimit, exists := os.LookupEnv("RATE_LIMIT"); exists {
 		if ratelimit, err := strconv.Atoi(envLimit); err == nil {
 			config.RateLimit = ratelimit
 		}
 	}
-	if envCryptoKey := os.Getenv("CRYPTO_KEY"); envCryptoKey != "" {
+	if envCryptoKey, exists := os.LookupEnv("CRYPTO_KEY"); exists {
 		config.CryptoKey = envCryptoKey
 	}
-	if envConfigFile := os.Getenv("CONFIG"); envConfigFile != "" {
+	if envConfigFile, exists := os.LookupEnv("CONFIG"); exists {
 		configFile = envConfigFile
 		var fileConfig AgentConfig
 		if err := loadConfigFromFile(configFile, &fileConfig); err == nil {
@@ -199,32 +199,32 @@ func SetConfigServer() Server {
 	config.Key = *key
 	config.CryptoKey = *cryptoKey
 
-	if envAddress := os.Getenv("ADDRESS"); envAddress != "" {
+	if envAddress, exists := os.LookupEnv("ADDRESS"); exists {
 		config.ServerAddress = envAddress
 	}
-	if envStoreInterval := os.Getenv("STORE_INTERVAL"); envStoreInterval != "" {
+	if envStoreInterval, exists := os.LookupEnv("STORE_INTERVAL"); exists {
 		if storeInterval, err := strconv.Atoi(envStoreInterval); err == nil {
 			config.StoreInterval = time.Duration(storeInterval) * time.Second
 		}
 	}
-	if envFilePath := os.Getenv("FILE_STORAGE_PATH"); envFilePath != "" {
+	if envFilePath, exists := os.LookupEnv("FILE_STORAGE_PATH"); exists {
 		config.FileStoragePath = envFilePath
 	}
-	if envRestore := os.Getenv("RESTORE"); envRestore != "" {
+	if envRestore, exists := os.LookupEnv("RESTORE"); exists {
 		if restoreVal, err := strconv.ParseBool(envRestore); err == nil {
 			config.Restore = restoreVal
 		}
 	}
-	if envDatabaseDSN := os.Getenv("DATABASE_DSN"); envDatabaseDSN != "" {
+	if envDatabaseDSN, exists := os.LookupEnv("DATABASE_DSN"); exists {
 		config.DatabaseDSN = envDatabaseDSN
 	}
-	if envKey := os.Getenv("KEY"); envKey != "" {
+	if envKey, exists := os.LookupEnv("KEY"); exists {
 		config.Key = envKey
 	}
-	if envCryptoKey := os.Getenv("CRYPTO_KEY"); envCryptoKey != "" {
+	if envCryptoKey, exists := os.LookupEnv("CRYPTO_KEY"); exists {
 		config.CryptoKey = envCryptoKey
 	}
-	if envConfigFile := os.Getenv("CONFIG"); envConfigFile != "" {
+	if envConfigFile, exists := os.LookupEnv("CONFIG"); exists {
 		configFile = envConfigFile
 		var fileConfig ServerConfig
 		if err := loadConfigFromFile(configFile, &fileConfig); err == nil {

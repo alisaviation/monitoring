@@ -6,7 +6,6 @@ package agent
 import (
 	"context"
 	"crypto/rsa"
-	"os"
 	"os/signal"
 	"sync"
 	"syscall"
@@ -65,35 +64,23 @@ func NewAgent(conf config.Agent) *Agent {
 // It runs until a shutdown signal is received or the context is cancelled.
 // Returns an error if the agent fails to start.
 func (a *Agent) Run() error {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := signal.NotifyContext(context.Background(),
+		syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	defer cancel()
+	logger.Log.Info("Agent started, waiting for shutdown signals")
 
-	go a.handleSignals(cancel)
 	a.startWorkers(ctx)
 
-	select {
-	case <-a.shutdownSignal:
-		logger.Log.Info("Shutdown signal received")
-	case <-ctx.Done():
-		logger.Log.Info("Context cancelled")
-	}
+	<-ctx.Done()
+	logger.Log.Info("Shutdown signal received, initiating graceful shutdown")
 
 	a.wg.Wait()
-	a.workerPool.Wait()
 	close(a.metricsChan)
+	a.workerPool.Wait()
+	a.sendRemainingMetrics(context.Background())
 	logger.Log.Info("Agent shutdown complete")
 
 	return nil
-}
-
-func (a *Agent) handleSignals(cancel context.CancelFunc) {
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-
-	sig := <-sigChan
-	logger.Log.Info("Received signal, agent is shutting down...", zap.String("signal", sig.String()))
-	close(a.shutdownSignal)
-	cancel()
 }
 
 func (a *Agent) startWorkers(ctx context.Context) {

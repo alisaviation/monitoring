@@ -69,10 +69,6 @@ func (s *Sender) SendMetricsBatch(ctx context.Context, metrics map[string]*model
 
 	if s.publicKey != nil {
 		jsonData, err = helpers.EncryptData(jsonData, s.publicKey)
-		if err != nil {
-			logger.Log.Error("Error encrypting data", zap.Error(err))
-			return fmt.Errorf("encryption failed: %w", err)
-		}
 	}
 
 	if err := s.sendWithRetry(ctx, "/updates/", jsonData, nil, key); err != nil {
