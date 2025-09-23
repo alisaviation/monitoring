@@ -186,7 +186,7 @@ func (s *Sender) sendWithRetry(ctx context.Context, endpoint string, data []byte
 	return fmt.Errorf("%w: last error: %v", ErrMaxRetriesExceeded, lastErr)
 }
 
-// getLocalIP возвращает локальный IP адрес агента
+// getLocalIP return the local IP address of the agent
 func getLocalIP() string {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {

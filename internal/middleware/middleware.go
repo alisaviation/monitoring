@@ -216,17 +216,15 @@ func DecryptMiddleware(privateKey *rsa.PrivateKey) func(next http.Handler) http.
 	}
 }
 
-// TrustedSubnetMiddleware проверяет, что IP-адрес клиента находится в доверенной подсети
+// TrustedSubnetMiddleware verifies that the client's IP address is in a trusted subnet
 func TrustedSubnetMiddleware(trustedSubnet string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Если подсеть не задана, пропускаем проверку
 			if trustedSubnet == "" {
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			// Получаем IP из заголовка X-Real-IP
 			realIP := r.Header.Get("X-Real-IP")
 			if realIP == "" {
 				logger.Log.Warn("X-Real-IP header is missing")
@@ -234,7 +232,6 @@ func TrustedSubnetMiddleware(trustedSubnet string) func(next http.Handler) http.
 				return
 			}
 
-			// Проверяем, что IP входит в доверенную подсеть
 			if !isIPInSubnet(realIP, trustedSubnet) {
 				logger.Log.Warn("IP address not in trusted subnet",
 					zap.String("ip", realIP),
@@ -251,9 +248,8 @@ func TrustedSubnetMiddleware(trustedSubnet string) func(next http.Handler) http.
 	}
 }
 
-// isIPInSubnet проверяет, принадлежит ли IP-адрес указанной подсети
+// isIPInSubnet checks if the IP address belongs to the specified subnet
 func isIPInSubnet(ipStr, subnetStr string) bool {
-	// Убираем возможные пробелы
 	ipStr = strings.TrimSpace(ipStr)
 	subnetStr = strings.TrimSpace(subnetStr)
 
