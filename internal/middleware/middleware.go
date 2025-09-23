@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/rsa"
 	"io"
 	"log"
 	"net/http"
@@ -178,4 +179,35 @@ func GetKeyFromContext(ctx context.Context) string {
 		return val
 	}
 	return ""
+}
+
+// DecryptMiddleware создает middleware для дешифрования входящих запросов
+func DecryptMiddleware(privateKey *rsa.PrivateKey) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if privateKey == nil || r.Header.Get("X-Content-Encrypted") != "hybrid-rsa-aes" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			encryptedData, err := io.ReadAll(r.Body)
+			if err != nil {
+				http.Error(w, "Bad request", http.StatusBadRequest)
+				return
+			}
+			defer r.Body.Close()
+
+			decryptedData, err := helpers.DecryptData(encryptedData, privateKey)
+			if err != nil {
+				http.Error(w, "Decryption failed", http.StatusBadRequest)
+				return
+			}
+
+			r.Body = io.NopCloser(bytes.NewReader(decryptedData))
+			r.ContentLength = int64(len(decryptedData))
+			r.Header.Del("X-Content-Encrypted")
+
+			next.ServeHTTP(w, r)
+		})
+	}
 }

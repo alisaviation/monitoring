@@ -108,6 +108,10 @@ func (s *Sender) prepareRequest(ctx context.Context, endpoint string, data []byt
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Content-Encoding", "gzip").
 		SetBody(compressedData)
+
+	if s.publicKey != nil {
+		req.SetHeader("X-Content-Encrypted", "hybrid-rsa-aes")
+	}
 	if s.key != "" {
 		hash := helpers.CalculateHash(data, key)
 		req.SetHeader("HashSHA256", hash)

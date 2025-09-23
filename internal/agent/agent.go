@@ -5,7 +5,7 @@ package agent
 
 import (
 	"context"
-	"os"
+	"crypto/rsa"
 	"os/signal"
 	"sync"
 	"syscall"
@@ -16,6 +16,7 @@ import (
 	"github.com/alisaviation/monitoring/internal/agent/collector"
 	"github.com/alisaviation/monitoring/internal/agent/sender"
 	"github.com/alisaviation/monitoring/internal/config"
+	"github.com/alisaviation/monitoring/internal/helpers"
 	"github.com/alisaviation/monitoring/internal/logger"
 	"github.com/alisaviation/monitoring/internal/models"
 )
@@ -31,18 +32,31 @@ type Agent struct {
 	bufferMutex    sync.Mutex
 	wg             sync.WaitGroup
 	shutdownSignal chan struct{}
+	publicKey      *rsa.PublicKey
 }
 
 // NewAgent creates a new Agent instance with the given configuration.
 func NewAgent(conf config.Agent) *Agent {
+	var publicKey *rsa.PublicKey
+	var err error
+
+	if conf.CryptoKey != "" {
+		publicKey, err = helpers.LoadPublicKey(conf.CryptoKey)
+		if err != nil {
+			logger.Log.Error("Failed to load public key", zap.Error(err))
+		} else {
+			logger.Log.Info("Public key loaded successfully")
+		}
+	}
 	return &Agent{
 		config:         conf,
 		collector:      collector.NewCollector(),
-		sender:         sender.NewSender(conf.ServerAddress, conf.Key),
+		sender:         sender.NewSender(conf.ServerAddress, conf.Key, publicKey),
 		workerPool:     sender.NewWorkerPool(conf.RateLimit),
 		metricsChan:    make(chan map[string]*models.Metric, conf.RateLimit*10),
 		metricsBuffer:  make(map[string]*models.Metric, 100),
 		shutdownSignal: make(chan struct{}),
+		publicKey:      publicKey,
 	}
 }
 
@@ -50,31 +64,23 @@ func NewAgent(conf config.Agent) *Agent {
 // It runs until a shutdown signal is received or the context is cancelled.
 // Returns an error if the agent fails to start.
 func (a *Agent) Run() error {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := signal.NotifyContext(context.Background(),
+		syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	defer cancel()
+	logger.Log.Info("Agent started, waiting for shutdown signals")
 
-	go a.handleSignals(cancel)
 	a.startWorkers(ctx)
 
-	select {
-	case <-a.shutdownSignal:
-		logger.Log.Info("Shutdown signal received")
-	case <-ctx.Done():
-		logger.Log.Info("Context cancelled")
-	}
+	<-ctx.Done()
+	logger.Log.Info("Shutdown signal received, initiating graceful shutdown")
+
 	a.wg.Wait()
+	close(a.metricsChan)
 	a.workerPool.Wait()
-	logger.Log.Info("Shutting down agent")
+	a.sendRemainingMetrics(context.Background())
+	logger.Log.Info("Agent shutdown complete")
+
 	return nil
-}
-
-func (a *Agent) handleSignals(cancel context.CancelFunc) {
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
-	sig := <-sigChan
-	logger.Log.Info("Received signal, agent is shutting down...", zap.String("signal", sig.String()))
-	cancel()
 }
 
 func (a *Agent) startWorkers(ctx context.Context) {
@@ -142,7 +148,16 @@ func (a *Agent) runMetricsProcessor(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			for {
+				select {
+				case metrics := <-a.metricsChan:
+					a.bufferMutex.Lock()
+					collector.UpdateMetricsBuffer(a.metricsBuffer, metrics)
+					a.bufferMutex.Unlock()
+				default:
+					return
+				}
+			}
 		case metrics := <-a.metricsChan:
 			a.bufferMutex.Lock()
 			collector.UpdateMetricsBuffer(a.metricsBuffer, metrics)
@@ -202,9 +217,19 @@ func (a *Agent) sendRemainingMetrics(ctx context.Context) {
 	logger.Log.Info("Sending remaining metrics before shutdown",
 		zap.Int("count", len(a.metricsBuffer)))
 
+	sendCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	var sendWg sync.WaitGroup
+	sendWg.Add(1)
+
 	a.workerPool.Submit(func() {
-		if err := a.sender.SendMetricsBatch(ctx, a.metricsBuffer, a.config.Key); err != nil {
+		defer sendWg.Done()
+		if err := a.sender.SendMetricsBatch(sendCtx, a.metricsBuffer, a.config.Key); err != nil {
 			logger.Log.Error("Failed to send final metrics batch", zap.Error(err))
+		} else {
+			logger.Log.Info("Final metrics batch sent successfully")
 		}
 	})
+	sendWg.Wait()
 }

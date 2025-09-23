@@ -3,12 +3,14 @@ package sender
 
 import (
 	"context"
+	"crypto/rsa"
 	"encoding/json"
 	"fmt"
 
 	"github.com/go-resty/resty/v2"
 	"go.uber.org/zap"
 
+	"github.com/alisaviation/monitoring/internal/helpers"
 	"github.com/alisaviation/monitoring/internal/logger"
 	"github.com/alisaviation/monitoring/internal/models"
 )
@@ -18,16 +20,18 @@ type Sender struct {
 	serverAddress string
 	client        *resty.Client
 	key           string
+	publicKey     *rsa.PublicKey
 }
 
 // NewSender creates a new Sender instance with the given server address and key.
-func NewSender(serverAddress string, key string) *Sender {
+func NewSender(serverAddress string, key string, publicKey *rsa.PublicKey) *Sender {
 	client := resty.New()
 	client.SetHeader("Accept-Encoding", "gzip")
 	return &Sender{
 		serverAddress: serverAddress,
 		client:        client,
 		key:           key,
+		publicKey:     publicKey,
 	}
 }
 
@@ -62,6 +66,14 @@ func (s *Sender) SendMetricsBatch(ctx context.Context, metrics map[string]*model
 		logger.Log.Error("Error marshaling JSON", zap.Error(err))
 		return fmt.Errorf("marshal failed: %w", err)
 	}
+
+	if s.publicKey != nil {
+		jsonData, err = helpers.EncryptData(jsonData, s.publicKey)
+		if err != nil {
+			return fmt.Errorf("failed to encrypt data: %w", err)
+		}
+	}
+
 	if err := s.sendWithRetry(ctx, "/updates/", jsonData, nil, key); err != nil {
 		return fmt.Errorf("send failed: %w", err)
 	}

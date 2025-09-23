@@ -3,6 +3,7 @@ package server
 
 import (
 	"context"
+	"crypto/rsa"
 	"database/sql"
 	"errors"
 	"net/http"
@@ -32,13 +33,30 @@ type ServerApp struct {
 	shutdownSignal chan struct{}
 	wg             sync.WaitGroup
 	mu             sync.RWMutex
+	privateKey     *rsa.PrivateKey
 }
 
 // NewServerApp creates a new ServerApp instance with the given configuration.
 func NewServerApp(conf config.Server) *ServerApp {
+	var privateKey *rsa.PrivateKey
+	var err error
+
+	if conf.CryptoKey != "" {
+		privateKey, err = helpers.LoadPrivateKey(conf.CryptoKey)
+		if err != nil {
+			logger.Log.Error("Failed to load private key",
+				zap.String("path", conf.CryptoKey),
+				zap.Error(err))
+		} else {
+			logger.Log.Info("Private key loaded successfully",
+				zap.String("path", conf.CryptoKey))
+		}
+	}
+
 	return &ServerApp{
 		config:         conf,
 		shutdownSignal: make(chan struct{}),
+		privateKey:     privateKey,
 	}
 }
 
@@ -57,6 +75,7 @@ func (s *ServerApp) Run() error {
 	if err := s.startHTTPServer(); err != nil {
 		return err
 	}
+
 	select {
 	case <-s.shutdownSignal:
 		logger.Log.Info("Shutdown signal received")
@@ -64,7 +83,6 @@ func (s *ServerApp) Run() error {
 		logger.Log.Info("Context cancelled")
 	}
 
-	//s.wg.Wait()
 	s.shutdown(ctx)
 	logger.Log.Info("Server shutdown complete")
 	return nil
@@ -147,12 +165,12 @@ func (s *ServerApp) saveMetrics() {
 
 func (s *ServerApp) handleSignals(cancel context.CancelFunc) {
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	sig := <-sigChan
 	logger.Log.Info("Received signal", zap.String("signal", sig.String()))
-	cancel()
 	close(s.shutdownSignal)
+	cancel()
 }
 
 func (s *ServerApp) startHTTPServer() error {
@@ -164,6 +182,7 @@ func (s *ServerApp) startHTTPServer() error {
 		logger.RequestResponseLogger,
 		middleware.GzipMiddleware,
 		middleware.SyncSaveMiddleware(s.config.StoreInterval, s.storage),
+		middleware.DecryptMiddleware(s.privateKey),
 	)
 	if s.config.Key != "" {
 		r.Use(
@@ -192,6 +211,7 @@ func (s *ServerApp) startHTTPServer() error {
 
 func (s *ServerApp) shutdown(ctx context.Context) {
 	if s.config.StoreInterval > 0 && s.storage != nil {
+		logger.Log.Info("Saving final metrics before shutdown")
 		s.saveMetrics()
 	}
 
@@ -201,6 +221,8 @@ func (s *ServerApp) shutdown(ctx context.Context) {
 
 		if err := s.httpServer.Shutdown(shutdownCtx); err != nil {
 			logger.Log.Error("HTTP server shutdown failed", zap.Error(err))
+		} else {
+			logger.Log.Info("HTTP server stopped successfully")
 		}
 	}
 
