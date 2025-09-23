@@ -8,12 +8,16 @@ import (
 	"crypto/rsa"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/alisaviation/monitoring/internal/helpers"
+	"github.com/alisaviation/monitoring/internal/logger"
 	"github.com/alisaviation/monitoring/internal/storage"
 )
 
@@ -210,4 +214,62 @@ func DecryptMiddleware(privateKey *rsa.PrivateKey) func(next http.Handler) http.
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// TrustedSubnetMiddleware проверяет, что IP-адрес клиента находится в доверенной подсети
+func TrustedSubnetMiddleware(trustedSubnet string) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Если подсеть не задана, пропускаем проверку
+			if trustedSubnet == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Получаем IP из заголовка X-Real-IP
+			realIP := r.Header.Get("X-Real-IP")
+			if realIP == "" {
+				logger.Log.Warn("X-Real-IP header is missing")
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+
+			// Проверяем, что IP входит в доверенную подсеть
+			if !isIPInSubnet(realIP, trustedSubnet) {
+				logger.Log.Warn("IP address not in trusted subnet",
+					zap.String("ip", realIP),
+					zap.String("trusted_subnet", trustedSubnet))
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+
+			logger.Log.Debug("IP address allowed",
+				zap.String("ip", realIP),
+				zap.String("trusted_subnet", trustedSubnet))
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// isIPInSubnet проверяет, принадлежит ли IP-адрес указанной подсети
+func isIPInSubnet(ipStr, subnetStr string) bool {
+	// Убираем возможные пробелы
+	ipStr = strings.TrimSpace(ipStr)
+	subnetStr = strings.TrimSpace(subnetStr)
+
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		logger.Log.Error("Invalid IP address", zap.String("ip", ipStr))
+		return false
+	}
+
+	_, subnet, err := net.ParseCIDR(subnetStr)
+	if err != nil {
+		logger.Log.Error("Invalid subnet CIDR",
+			zap.String("subnet", subnetStr),
+			zap.Error(err))
+		return false
+	}
+
+	return subnet.Contains(ip)
 }

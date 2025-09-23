@@ -184,6 +184,13 @@ func (s *ServerApp) startHTTPServer() error {
 		middleware.SyncSaveMiddleware(s.config.StoreInterval, s.storage),
 		middleware.DecryptMiddleware(s.privateKey),
 	)
+
+	if s.config.TrustedSubnet != "" {
+		r.Use(middleware.TrustedSubnetMiddleware(s.config.TrustedSubnet))
+		logger.Log.Info("Trusted subnet protection enabled",
+			zap.String("subnet", s.config.TrustedSubnet))
+	}
+
 	if s.config.Key != "" {
 		r.Use(
 			middleware.KeyContextMiddleware(s.config.Key),

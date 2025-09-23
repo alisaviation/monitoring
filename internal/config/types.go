@@ -17,6 +17,7 @@ type ServerConfig struct {
 	DatabaseDSN   string `json:"database_dsn"`
 	CryptoKey     string `json:"crypto_key"`
 	Key           string `json:"key"`
+	TrustedSubnet string `json:"trusted_subnet"`
 }
 
 // AgentConfig represents agent configuration from JSON file

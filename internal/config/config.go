@@ -136,6 +136,7 @@ type Server struct {
 	DatabaseDSN     string
 	Key             string
 	CryptoKey       string
+	TrustedSubnet   string
 }
 
 func SetConfigServer() Server {
@@ -151,6 +152,7 @@ func SetConfigServer() Server {
 	databaseDSN := flag.String("d", "", "Database connection string (DSN)")
 	key := flag.String("k", "", "Hash key")
 	cryptoKey := flag.String("crypto-key", "", "Path to private key for decryption")
+	trustedSubnet := flag.String("t", "", "Trusted subnet in CIDR notation")
 	flag.Parse()
 
 	defaultConfig := Server{
@@ -161,6 +163,7 @@ func SetConfigServer() Server {
 		DatabaseDSN:     "",
 		Key:             "",
 		CryptoKey:       "",
+		TrustedSubnet:   "",
 	}
 
 	config = defaultConfig
@@ -187,6 +190,9 @@ func SetConfigServer() Server {
 			if fileConfig.CryptoKey != "" {
 				config.CryptoKey = fileConfig.CryptoKey
 			}
+			if fileConfig.TrustedSubnet != "" {
+				config.TrustedSubnet = fileConfig.TrustedSubnet
+			}
 			config.Restore = fileConfig.Restore
 		}
 	}
@@ -198,6 +204,7 @@ func SetConfigServer() Server {
 	config.DatabaseDSN = *databaseDSN
 	config.Key = *key
 	config.CryptoKey = *cryptoKey
+	config.TrustedSubnet = *trustedSubnet
 
 	if envAddress, exists := os.LookupEnv("ADDRESS"); exists {
 		config.ServerAddress = envAddress
@@ -223,6 +230,9 @@ func SetConfigServer() Server {
 	}
 	if envCryptoKey, exists := os.LookupEnv("CRYPTO_KEY"); exists {
 		config.CryptoKey = envCryptoKey
+	}
+	if envTrustedSubnet, exists := os.LookupEnv("TRUSTED_SUBNET"); exists {
+		config.TrustedSubnet = envTrustedSubnet
 	}
 	if envConfigFile, exists := os.LookupEnv("CONFIG"); exists {
 		configFile = envConfigFile
