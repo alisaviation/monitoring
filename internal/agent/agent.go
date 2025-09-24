@@ -14,7 +14,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/alisaviation/monitoring/internal/agent/collector"
-	"github.com/alisaviation/monitoring/internal/agent/sender"
+	"github.com/alisaviation/monitoring/internal/agent/grpc_client"
+	sender2 "github.com/alisaviation/monitoring/internal/agent/http_client/sender"
 	"github.com/alisaviation/monitoring/internal/config"
 	"github.com/alisaviation/monitoring/internal/helpers"
 	"github.com/alisaviation/monitoring/internal/logger"
@@ -25,19 +26,21 @@ import (
 type Agent struct {
 	config         config.Agent
 	collector      *collector.Collector
-	sender         *sender.Sender
-	workerPool     *sender.WorkerPool
+	sender         *sender2.Sender
+	workerPool     *sender2.WorkerPool
 	metricsChan    chan map[string]*models.Metric
 	metricsBuffer  map[string]*models.Metric
 	bufferMutex    sync.Mutex
 	wg             sync.WaitGroup
 	shutdownSignal chan struct{}
 	publicKey      *rsa.PublicKey
+	grpcClient     *grpc_client.GRPCClient
 }
 
 // NewAgent creates a new Agent instance with the given configuration.
 func NewAgent(conf config.Agent) *Agent {
 	var publicKey *rsa.PublicKey
+	var grpcClient *grpc_client.GRPCClient
 	var err error
 
 	if conf.CryptoKey != "" {
@@ -48,15 +51,27 @@ func NewAgent(conf config.Agent) *Agent {
 			logger.Log.Info("Public key loaded successfully")
 		}
 	}
+	if conf.UseGRPC {
+		grpcClient, err = grpc_client.NewGRPCClient(conf.GRPCAddress, false, conf.Key, publicKey)
+		if err != nil {
+			logger.Log.Error("Failed to create gRPC client", zap.Error(err))
+		} else {
+			if conf.CryptoKey != "" {
+				grpcClient.SetUseEncryption(true)
+			}
+			logger.Log.Info("gRPC client initialized")
+		}
+	}
 	return &Agent{
 		config:         conf,
 		collector:      collector.NewCollector(),
-		sender:         sender.NewSender(conf.ServerAddress, conf.Key, publicKey),
-		workerPool:     sender.NewWorkerPool(conf.RateLimit),
+		sender:         sender2.NewSender(conf.ServerAddress, conf.Key, publicKey),
+		workerPool:     sender2.NewWorkerPool(conf.RateLimit),
 		metricsChan:    make(chan map[string]*models.Metric, conf.RateLimit*10),
 		metricsBuffer:  make(map[string]*models.Metric, 100),
 		shutdownSignal: make(chan struct{}),
 		publicKey:      publicKey,
+		grpcClient:     grpcClient,
 	}
 }
 
@@ -78,6 +93,7 @@ func (a *Agent) Run() error {
 	close(a.metricsChan)
 	a.workerPool.Wait()
 	a.sendRemainingMetrics(context.Background())
+
 	logger.Log.Info("Agent shutdown complete")
 
 	return nil
@@ -197,10 +213,17 @@ func (a *Agent) sendCurrentMetrics(ctx context.Context) {
 	}
 
 	a.workerPool.Submit(func() {
-		if err := a.sender.SendMetricsBatch(ctx, metricsCopy, a.config.Key); err != nil {
+		var err error
+		if a.config.UseGRPC && a.grpcClient != nil {
+			err = a.grpcClient.SendMetricBatch(ctx, metricsCopy)
+		} else {
+			err = a.sender.SendMetricsBatch(ctx, metricsCopy, a.config.Key)
+		}
+		if err != nil {
 			logger.Log.Error("Failed to send metrics batch", zap.Error(err))
 			return
 		}
+		logger.Log.Info("Metrics batch sent successfully")
 	})
 
 	a.metricsBuffer = make(map[string]*models.Metric)
@@ -225,7 +248,15 @@ func (a *Agent) sendRemainingMetrics(ctx context.Context) {
 
 	a.workerPool.Submit(func() {
 		defer sendWg.Done()
-		if err := a.sender.SendMetricsBatch(sendCtx, a.metricsBuffer, a.config.Key); err != nil {
+		var err error
+
+		if a.config.UseGRPC && a.grpcClient != nil {
+			err = a.grpcClient.SendMetricBatch(sendCtx, a.metricsBuffer)
+		} else {
+			err = a.sender.SendMetricsBatch(sendCtx, a.metricsBuffer, a.config.Key)
+		}
+
+		if err != nil {
 			logger.Log.Error("Failed to send final metrics batch", zap.Error(err))
 		} else {
 			logger.Log.Info("Final metrics batch sent successfully")

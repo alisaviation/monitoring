@@ -11,11 +11,13 @@ import (
 
 type Agent struct {
 	ServerAddress  string
+	GRPCAddress    string
 	PollInterval   time.Duration
 	ReportInterval time.Duration
 	Key            string
 	RateLimit      int
 	CryptoKey      string
+	UseGRPC        bool
 }
 
 func SetConfigAgent() Agent {
@@ -25,21 +27,25 @@ func SetConfigAgent() Agent {
 	flag.StringVar(&configFile, "c", "", "Path to config file")
 	flag.StringVar(&configFile, "config", "", "Path to config file")
 	address := flag.String("a", "localhost:8080", "HTTP server address")
+	grpcAddress := flag.String("ga", "localhost:8081", "gRPC server address")
 	poll := flag.Int64("p", 2, "Poll interval in seconds")
 	report := flag.Int64("r", 10, "Report interval in seconds")
 	key := flag.String("k", "", "Hash key")
 	limit := flag.Int("l", 5, "Rate limit")
 	cryptoKey := flag.String("crypto-key", "", "Path to public key for encryption")
+	useGRPC := flag.Bool("grpc_handlers", false, "Use gRPC instead of HTTP")
 
 	flag.Parse()
 
 	defaultConfig := Agent{
 		ServerAddress:  "localhost:8080",
+		GRPCAddress:    "localhost:8081",
 		PollInterval:   2 * time.Second,
 		ReportInterval: 10 * time.Second,
 		Key:            "",
 		RateLimit:      5,
 		CryptoKey:      "",
+		UseGRPC:        false,
 	}
 
 	config = defaultConfig
@@ -50,6 +56,9 @@ func SetConfigAgent() Agent {
 		} else {
 			if fileConfig.Address != "" {
 				config.ServerAddress = fileConfig.Address
+			}
+			if fileConfig.GRPCAddress != "" {
+				config.GRPCAddress = fileConfig.GRPCAddress
 			}
 			if fileConfig.PollInterval != "" {
 				config.PollInterval = parseDuration(fileConfig.PollInterval, defaultConfig.PollInterval)
@@ -66,18 +75,26 @@ func SetConfigAgent() Agent {
 			if fileConfig.CryptoKey != "" {
 				config.CryptoKey = fileConfig.CryptoKey
 			}
+			if fileConfig.UseGRPC {
+				config.UseGRPC = fileConfig.UseGRPC
+			}
 		}
 	}
 
 	config.ServerAddress = *address
+	config.GRPCAddress = *grpcAddress
 	config.PollInterval = time.Duration(*poll) * time.Second
 	config.ReportInterval = time.Duration(*report) * time.Second
 	config.Key = *key
 	config.RateLimit = *limit
 	config.CryptoKey = *cryptoKey
+	config.UseGRPC = *useGRPC
 
 	if envAddress, exists := os.LookupEnv("ADDRESS"); exists {
 		config.ServerAddress = envAddress
+	}
+	if envGRPCAddress, exists := os.LookupEnv("GRPC_ADDRESS"); exists {
+		config.GRPCAddress = envGRPCAddress
 	}
 	if envReportInterval, exists := os.LookupEnv("REPORT_INTERVAL"); exists {
 		if reportInterval, err := strconv.Atoi(envReportInterval); err == nil {
@@ -100,12 +117,20 @@ func SetConfigAgent() Agent {
 	if envCryptoKey, exists := os.LookupEnv("CRYPTO_KEY"); exists {
 		config.CryptoKey = envCryptoKey
 	}
+	if envUseGRPC, exists := os.LookupEnv("USE_GRPC"); exists {
+		if useGRPC, err := strconv.ParseBool(envUseGRPC); err == nil {
+			config.UseGRPC = useGRPC
+		}
+	}
 	if envConfigFile, exists := os.LookupEnv("CONFIG"); exists {
 		configFile = envConfigFile
 		var fileConfig AgentConfig
 		if err := loadConfigFromFile(configFile, &fileConfig); err == nil {
 			if config.ServerAddress == "localhost:8080" && fileConfig.Address != "" {
 				config.ServerAddress = fileConfig.Address
+			}
+			if config.GRPCAddress == "localhost:8081" && fileConfig.GRPCAddress != "" {
+				config.GRPCAddress = fileConfig.GRPCAddress
 			}
 			if config.PollInterval == 2*time.Second && fileConfig.PollInterval != "" {
 				config.PollInterval = parseDuration(fileConfig.PollInterval, config.PollInterval)
@@ -122,6 +147,9 @@ func SetConfigAgent() Agent {
 			if config.CryptoKey == "" && fileConfig.CryptoKey != "" {
 				config.CryptoKey = fileConfig.CryptoKey
 			}
+			if !config.UseGRPC && fileConfig.UseGRPC {
+				config.UseGRPC = fileConfig.UseGRPC
+			}
 		}
 	}
 
@@ -130,6 +158,7 @@ func SetConfigAgent() Agent {
 
 type Server struct {
 	ServerAddress   string
+	GRPCAddress     string
 	StoreInterval   time.Duration
 	FileStoragePath string
 	Restore         bool
@@ -149,6 +178,7 @@ func SetConfigServer() Server {
 	filePath := flag.String("f", "metrics.json", "File storage path")
 	restore := flag.Bool("r", true, "Restore metrics from file")
 	address := flag.String("a", "localhost:8080", "HTTP server address")
+	grpcAddress := flag.String("ga", "localhost:8081", "gRPC server address")
 	databaseDSN := flag.String("d", "", "Database connection string (DSN)")
 	key := flag.String("k", "", "Hash key")
 	cryptoKey := flag.String("crypto-key", "", "Path to private key for decryption")
@@ -157,6 +187,7 @@ func SetConfigServer() Server {
 
 	defaultConfig := Server{
 		ServerAddress:   "localhost:8080",
+		GRPCAddress:     "localhost:8081",
 		StoreInterval:   300 * time.Second,
 		FileStoragePath: "metrics.json",
 		Restore:         true,
@@ -174,6 +205,9 @@ func SetConfigServer() Server {
 		} else {
 			if fileConfig.Address != "" {
 				config.ServerAddress = fileConfig.Address
+			}
+			if fileConfig.GRPCAddress != "" {
+				config.GRPCAddress = fileConfig.GRPCAddress
 			}
 			if fileConfig.StoreInterval != "" {
 				config.StoreInterval = parseDuration(fileConfig.StoreInterval, defaultConfig.StoreInterval)
@@ -198,6 +232,7 @@ func SetConfigServer() Server {
 	}
 
 	config.ServerAddress = *address
+	config.GRPCAddress = *grpcAddress
 	config.StoreInterval = time.Duration(*storeInt) * time.Second
 	config.FileStoragePath = *filePath
 	config.Restore = *restore
@@ -208,6 +243,9 @@ func SetConfigServer() Server {
 
 	if envAddress, exists := os.LookupEnv("ADDRESS"); exists {
 		config.ServerAddress = envAddress
+	}
+	if envGRPCAddress, exists := os.LookupEnv("GRPC_ADDRESS"); exists {
+		config.GRPCAddress = envGRPCAddress
 	}
 	if envStoreInterval, exists := os.LookupEnv("STORE_INTERVAL"); exists {
 		if storeInterval, err := strconv.Atoi(envStoreInterval); err == nil {
@@ -241,6 +279,9 @@ func SetConfigServer() Server {
 			if config.ServerAddress == "localhost:8080" && fileConfig.Address != "" {
 				config.ServerAddress = fileConfig.Address
 			}
+			if config.GRPCAddress == "localhost:8081" && fileConfig.GRPCAddress != "" {
+				config.GRPCAddress = fileConfig.GRPCAddress
+			}
 			if config.StoreInterval == 300*time.Second && fileConfig.StoreInterval != "" {
 				config.StoreInterval = parseDuration(fileConfig.StoreInterval, config.StoreInterval)
 			}
@@ -258,6 +299,9 @@ func SetConfigServer() Server {
 			}
 			if config.Restore && !fileConfig.Restore {
 				config.Restore = fileConfig.Restore
+			}
+			if config.TrustedSubnet == "" && fileConfig.TrustedSubnet != "" {
+				config.TrustedSubnet = fileConfig.TrustedSubnet
 			}
 		}
 	}

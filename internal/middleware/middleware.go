@@ -178,14 +178,7 @@ func KeyContextMiddleware(key string) func(next http.Handler) http.Handler {
 	}
 }
 
-func GetKeyFromContext(ctx context.Context) string {
-	if val, ok := ctx.Value(secretKey).(string); ok {
-		return val
-	}
-	return ""
-}
-
-// DecryptMiddleware создает middleware для дешифрования входящих запросов
+// DecryptMiddleware creates middleware to decrypt incoming requests
 func DecryptMiddleware(privateKey *rsa.PrivateKey) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -248,7 +241,6 @@ func TrustedSubnetMiddleware(trustedSubnet string) func(next http.Handler) http.
 	}
 }
 
-// isIPInSubnet checks if the IP address belongs to the specified subnet
 func isIPInSubnet(ipStr, subnetStr string) bool {
 	ipStr = strings.TrimSpace(ipStr)
 	subnetStr = strings.TrimSpace(subnetStr)

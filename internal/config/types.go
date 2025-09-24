@@ -11,6 +11,7 @@ import (
 // ServerConfig represents server configuration from JSON file
 type ServerConfig struct {
 	Address       string `json:"address"`
+	GRPCAddress   string `json:"grpc_address"`
 	Restore       bool   `json:"restore"`
 	StoreInterval string `json:"store_interval"`
 	StoreFile     string `json:"store_file"`
@@ -23,11 +24,13 @@ type ServerConfig struct {
 // AgentConfig represents agent configuration from JSON file
 type AgentConfig struct {
 	Address        string `json:"address"`
+	GRPCAddress    string `json:"grpc_address"`
 	ReportInterval string `json:"report_interval"`
 	PollInterval   string `json:"poll_interval"`
 	CryptoKey      string `json:"crypto_key"`
 	Key            string `json:"key"`
 	RateLimit      int    `json:"rate_limit"`
+	UseGRPC        bool   `json:"use_grpc"`
 }
 
 // loadConfigFromFile loads configuration from JSON file
