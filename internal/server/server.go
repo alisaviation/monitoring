@@ -23,8 +23,8 @@ import (
 	"github.com/alisaviation/monitoring/internal/helpers"
 	"github.com/alisaviation/monitoring/internal/logger"
 	"github.com/alisaviation/monitoring/internal/middleware"
-	"github.com/alisaviation/monitoring/internal/server/grpcHandlers"
-	"github.com/alisaviation/monitoring/internal/server/httpHandlers"
+	"github.com/alisaviation/monitoring/internal/server/grpchandlers"
+	"github.com/alisaviation/monitoring/internal/server/httphandlers"
 	"github.com/alisaviation/monitoring/internal/service"
 	"github.com/alisaviation/monitoring/internal/storage"
 	"github.com/alisaviation/monitoring/proto/brief/rpc"
@@ -234,7 +234,7 @@ func (s *ServerApp) startGRPCServer() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	grpcHandlers := grpcHandlers.NewGRPCHandlers(s.metricsService, s.config.Key, s.privateKey)
+	grpcHandlers := grpchandlers.NewGRPCHandlers(s.metricsService, s.config.Key, s.privateKey)
 	grpcInterceptor := middleware.NewGRPCInterceptor(
 		s.privateKey,
 		s.config.Key,
@@ -300,7 +300,7 @@ func (s *ServerApp) shutdown(ctx context.Context) {
 }
 
 func (s *ServerApp) registerRoutes(r *chi.Mux) {
-	httpHandlers := httpHandlers.NewHTTPHandlers(s.metricsService, s.config.Key)
+	httpHandlers := httphandlers.NewHTTPHandlers(s.metricsService, s.config.Key)
 
 	r.Post("/update/{type}/{name}/{value}", helpers.MethodCheck([]string{http.MethodPost})(httpHandlers.UpdateMetrics))
 	r.Get("/value/{type}/{name}", helpers.MethodCheck([]string{http.MethodGet})(httpHandlers.GetValue))

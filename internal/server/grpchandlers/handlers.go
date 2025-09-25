@@ -1,5 +1,5 @@
 // Package grpc_handlers implements gRPC server handlers for the monitoring service.
-package grpcHandlers
+package grpchandlers
 
 import (
 	"context"
