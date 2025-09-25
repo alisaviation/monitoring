@@ -1,5 +1,5 @@
 // Package grpc_client provides a Go client for sending metrics to a gRPC-based monitoring service.
-package grpcAgentClient
+package grpcagentclient
 
 import (
 	"context"
