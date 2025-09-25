@@ -1,4 +1,5 @@
-package grpc_handlers
+// Package grpchandlers provides gRPC handlers for the monitoring service.
+package grpcHandlers
 
 import (
 	"context"
@@ -42,7 +43,7 @@ func (b *benchmarkMetricsService) Ping(ctx context.Context) error {
 
 type BenchmarkGRPCHandlers struct {
 	rpc.UnimplementedMonitoringServiceServer
-	metricsService *benchmarkMetricsService
+	metricsService benchmarkMetricsService
 }
 
 func (h *BenchmarkGRPCHandlers) protoToModel(protoMetric *rpc.Metric) models.Metric {
@@ -98,9 +99,48 @@ func (h *BenchmarkGRPCHandlers) isValidMetric(metric models.Metric) bool {
 	}
 }
 
+func (h *BenchmarkGRPCHandlers) Ping(ctx context.Context, req *rpc.PingRequest) (*rpc.PingResponse, error) {
+	err := h.metricsService.Ping(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &rpc.PingResponse{}, nil
+}
+
+func (h *BenchmarkGRPCHandlers) Value(ctx context.Context, req *rpc.ValueRequest) (*rpc.ValueResponse, error) {
+	metric, err := h.metricsService.GetMetric(ctx, req.MetricType, req.MetricName)
+	if err != nil {
+		return nil, err
+	}
+
+	if metric == nil {
+		return &rpc.ValueResponse{}, nil
+	}
+
+	protoMetric := h.modelToProto(*metric)
+	return &rpc.ValueResponse{Metric: protoMetric}, nil
+}
+
+func (h *BenchmarkGRPCHandlers) Update(ctx context.Context, req *rpc.UpdateRequest) (*rpc.UpdateResponse, error) {
+	metrics := make([]models.Metric, 0, len(req.Metrics))
+	for _, protoMetric := range req.Metrics {
+		metric := h.protoToModel(protoMetric)
+		if h.isValidMetric(metric) {
+			metrics = append(metrics, metric)
+		}
+	}
+
+	err := h.metricsService.UpdateMetricsBatch(ctx, metrics)
+	if err != nil {
+		return nil, err
+	}
+
+	return &rpc.UpdateResponse{}, nil
+}
+
 func BenchmarkPing(b *testing.B) {
 	handler := &BenchmarkGRPCHandlers{
-		metricsService: &benchmarkMetricsService{},
+		metricsService: benchmarkMetricsService{},
 	}
 	ctx := context.Background()
 	req := &rpc.PingRequest{}
@@ -118,7 +158,7 @@ func BenchmarkPing(b *testing.B) {
 
 func BenchmarkValue(b *testing.B) {
 	handler := &BenchmarkGRPCHandlers{
-		metricsService: &benchmarkMetricsService{},
+		metricsService: benchmarkMetricsService{},
 	}
 	ctx := context.Background()
 
@@ -153,7 +193,7 @@ func BenchmarkValue(b *testing.B) {
 
 func BenchmarkUpdate(b *testing.B) {
 	handler := &BenchmarkGRPCHandlers{
-		metricsService: &benchmarkMetricsService{},
+		metricsService: benchmarkMetricsService{},
 	}
 	ctx := context.Background()
 
@@ -336,7 +376,7 @@ func BenchmarkIsValidMetric(b *testing.B) {
 
 func BenchmarkUpdateWithDifferentPayloadSizes(b *testing.B) {
 	handler := &BenchmarkGRPCHandlers{
-		metricsService: &benchmarkMetricsService{},
+		metricsService: benchmarkMetricsService{},
 	}
 	ctx := context.Background()
 	createMetrics := func(numMetrics, dataSize int) []*rpc.Metric {
@@ -385,7 +425,7 @@ func BenchmarkUpdateWithDifferentPayloadSizes(b *testing.B) {
 
 func BenchmarkConcurrentPing(b *testing.B) {
 	handler := &BenchmarkGRPCHandlers{
-		metricsService: &benchmarkMetricsService{},
+		metricsService: benchmarkMetricsService{},
 	}
 	ctx := context.Background()
 	req := &rpc.PingRequest{}
@@ -405,7 +445,7 @@ func BenchmarkConcurrentPing(b *testing.B) {
 
 func BenchmarkConcurrentValue(b *testing.B) {
 	handler := &BenchmarkGRPCHandlers{
-		metricsService: &benchmarkMetricsService{},
+		metricsService: benchmarkMetricsService{},
 	}
 	ctx := context.Background()
 
@@ -439,7 +479,7 @@ func BenchmarkConcurrentValue(b *testing.B) {
 
 func BenchmarkMemoryUsage(b *testing.B) {
 	handler := &BenchmarkGRPCHandlers{
-		metricsService: &benchmarkMetricsService{},
+		metricsService: benchmarkMetricsService{},
 	}
 	ctx := context.Background()
 	metrics := make([]*rpc.Metric, 1000)

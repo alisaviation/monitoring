@@ -1,4 +1,4 @@
-package grpc_handlers
+package grpcHandlers
 
 import (
 	"github.com/alisaviation/monitoring/internal/models"

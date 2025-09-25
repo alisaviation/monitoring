@@ -1,5 +1,5 @@
 // Package grpc_client provides a Go client for sending metrics to a gRPC-based monitoring service.
-package grpc_client
+package grpcAgentClient
 
 import (
 	"context"
@@ -43,7 +43,7 @@ func NewGRPCClient(address string, useTLS bool, key string, publicKey *rsa.Publi
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}
 
-	conn, err := grpc.Dial(address, opts...)
+	conn, err := grpc.NewClient(address, opts...)
 	if err != nil {
 		return nil, err
 	}

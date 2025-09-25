@@ -14,7 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/alisaviation/monitoring/internal/agent/collector"
-	"github.com/alisaviation/monitoring/internal/agent/grpc_client"
+	"github.com/alisaviation/monitoring/internal/agent/grpcAgentClient"
 	sender2 "github.com/alisaviation/monitoring/internal/agent/http_client/sender"
 	"github.com/alisaviation/monitoring/internal/config"
 	"github.com/alisaviation/monitoring/internal/helpers"
@@ -34,13 +34,13 @@ type Agent struct {
 	wg             sync.WaitGroup
 	shutdownSignal chan struct{}
 	publicKey      *rsa.PublicKey
-	grpcClient     *grpc_client.GRPCClient
+	grpcClient     *grpcAgentClient.GRPCClient
 }
 
 // NewAgent creates a new Agent instance with the given configuration.
 func NewAgent(conf config.Agent) *Agent {
 	var publicKey *rsa.PublicKey
-	var grpcClient *grpc_client.GRPCClient
+	var grpcClient *grpcAgentClient.GRPCClient
 	var err error
 
 	if conf.CryptoKey != "" {
@@ -52,7 +52,7 @@ func NewAgent(conf config.Agent) *Agent {
 		}
 	}
 	if conf.UseGRPC {
-		grpcClient, err = grpc_client.NewGRPCClient(conf.GRPCAddress, false, conf.Key, publicKey)
+		grpcClient, err = grpcAgentClient.NewGRPCClient(conf.GRPCAddress, false, conf.Key, publicKey)
 		if err != nil {
 			logger.Log.Error("Failed to create gRPC client", zap.Error(err))
 		} else {

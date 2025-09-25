@@ -1,6 +1,6 @@
 // Package grpc_handlers implements http server handlers for the monitoring service.
 
-package http_handlers
+package httpHandlers
 
 import (
 	"encoding/json"
