@@ -33,20 +33,7 @@ func NewGRPCHandlers(metricsService *service.MetricsService, key string, private
 
 // Update handles batch metric updates via unary RPC call.
 func (h *GRPCHandlers) Update(ctx context.Context, req *rpc.UpdateRequest) (*rpc.UpdateResponse, error) {
-	//var metricsToProcess []*rpc.Metric
-	//
-	//if len(req.EncryptedData) > 0 {
-	//	metricsToProcess = req.Metrics
-	//} else if len(req.Metrics) > 0 {
-	//	metricsToProcess = req.Metrics
-	//} else {
-	//	return &rpc.UpdateResponse{
-	//		Status: "error",
-	//		Error:  "no metrics provided",
-	//	}, status.Error(codes.InvalidArgument, "no metrics provided")
-	//}
 
-	//if len(metricsToProcess) == 0 {
 	if len(req.Metrics) == 0 {
 		return &rpc.UpdateResponse{
 			Status: "error",
@@ -54,8 +41,6 @@ func (h *GRPCHandlers) Update(ctx context.Context, req *rpc.UpdateRequest) (*rpc
 		}, status.Error(codes.InvalidArgument, "no metrics provided")
 	}
 
-	//metrics := make([]models.Metric, 0, len(metricsToProcess))
-	//for _, protoMetric := range metricsToProcess {
 	metrics := make([]models.Metric, 0, len(req.Metrics))
 	for _, protoMetric := range req.Metrics {
 		metric := h.protoToModel(protoMetric)
@@ -76,17 +61,6 @@ func (h *GRPCHandlers) Update(ctx context.Context, req *rpc.UpdateRequest) (*rpc
 
 // Value retrieves a specific metric by type and name.
 func (h *GRPCHandlers) Value(ctx context.Context, req *rpc.ValueRequest) (*rpc.ValueResponse, error) {
-	//var metricType, metricName string
-	//
-	//if len(req.EncryptedData) > 0 {
-	//	metricType = req.MetricType
-	//	metricName = req.MetricName
-	//} else {
-	//	metricType = req.MetricType
-	//	metricName = req.MetricName
-	//}
-
-	//metric, err := h.metricsService.GetMetric(ctx, metricType, metricName)
 	metric, err := h.metricsService.GetMetric(ctx, req.MetricType, req.MetricName)
 	if err != nil {
 		return &rpc.ValueResponse{
