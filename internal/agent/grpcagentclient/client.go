@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"crypto/tls"
+	"fmt"
 	"time"
 
 	"google.golang.org/grpc"
@@ -79,12 +80,12 @@ func (c *GRPCClient) SendMetricBatch(ctx context.Context, metrics map[string]*mo
 	if c.useEncryption && c.publicKey != nil {
 		reqData, err := proto.Marshal(req)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to marshal request: %w", err)
 		}
 
 		encryptedData, err := helpers.EncryptData(reqData, c.publicKey)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to encrypt data: %w", err)
 		}
 
 		encryptedReq := &rpc.UpdateRequest{
@@ -101,7 +102,7 @@ func (c *GRPCClient) SendMetricBatch(ctx context.Context, metrics map[string]*mo
 	if c.key != "" {
 		reqData, err := proto.Marshal(req)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to marshal request: %w", err)
 		}
 		hash := helpers.CalculateHash(reqData, c.key)
 		md.Set("hashsha256", hash)

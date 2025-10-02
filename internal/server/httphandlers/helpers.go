@@ -120,9 +120,6 @@ func (h *HTTPHandlers) respondWithMetric(w http.ResponseWriter, r *http.Request,
 
 	h.setResponseHash(w, jsonData)
 	w.Header().Set("Content-Type", "application/json")
-	//if err := json.NewEncoder(w).Encode(metric); err != nil {
-	//	http_handlers.Error(w, err.Error(), http_handlers.StatusInternalServerError)
-	//}
 	w.Write(jsonData)
 }
 
