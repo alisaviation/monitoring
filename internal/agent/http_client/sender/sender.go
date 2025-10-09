@@ -27,6 +27,12 @@ type Sender struct {
 func NewSender(serverAddress string, key string, publicKey *rsa.PublicKey) *Sender {
 	client := resty.New()
 	client.SetHeader("Accept-Encoding", "gzip")
+
+	localIP := getLocalIP()
+	if localIP != "" {
+		client.SetHeader("X-Real-IP", localIP)
+	}
+
 	return &Sender{
 		serverAddress: serverAddress,
 		client:        client,

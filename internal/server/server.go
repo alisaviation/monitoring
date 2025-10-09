@@ -6,6 +6,8 @@ import (
 	"crypto/rsa"
 	"database/sql"
 	"errors"
+	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,12 +17,17 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 
 	"github.com/alisaviation/monitoring/internal/config"
 	"github.com/alisaviation/monitoring/internal/helpers"
 	"github.com/alisaviation/monitoring/internal/logger"
 	"github.com/alisaviation/monitoring/internal/middleware"
+	"github.com/alisaviation/monitoring/internal/server/grpchandlers"
+	"github.com/alisaviation/monitoring/internal/server/httphandlers"
+	"github.com/alisaviation/monitoring/internal/service"
 	"github.com/alisaviation/monitoring/internal/storage"
+	"github.com/alisaviation/monitoring/proto/brief/rpc"
 )
 
 // ServerApp represents the main server application.
@@ -30,10 +37,12 @@ type ServerApp struct {
 	storage        storage.Storage
 	db             *sql.DB
 	httpServer     *http.Server
+	grpcServer     *grpc.Server
 	shutdownSignal chan struct{}
 	wg             sync.WaitGroup
 	mu             sync.RWMutex
 	privateKey     *rsa.PrivateKey
+	metricsService *service.MetricsService
 }
 
 // NewServerApp creates a new ServerApp instance with the given configuration.
@@ -71,8 +80,13 @@ func (s *ServerApp) Run() error {
 		return err
 	}
 
+	s.metricsService = service.NewMetricsService(s.storage, s.db)
+
 	go s.handleSignals(cancel)
 	if err := s.startHTTPServer(); err != nil {
+		return err
+	}
+	if err := s.startGRPCServer(); err != nil {
 		return err
 	}
 
@@ -184,6 +198,13 @@ func (s *ServerApp) startHTTPServer() error {
 		middleware.SyncSaveMiddleware(s.config.StoreInterval, s.storage),
 		middleware.DecryptMiddleware(s.privateKey),
 	)
+
+	if s.config.TrustedSubnet != "" {
+		r.Use(middleware.TrustedSubnetMiddleware(s.config.TrustedSubnet))
+		logger.Log.Info("Trusted subnet protection enabled",
+			zap.String("subnet", s.config.TrustedSubnet))
+	}
+
 	if s.config.Key != "" {
 		r.Use(
 			middleware.KeyContextMiddleware(s.config.Key),
@@ -209,6 +230,45 @@ func (s *ServerApp) startHTTPServer() error {
 	return nil
 }
 
+func (s *ServerApp) startGRPCServer() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	grpcHandlers := grpchandlers.NewGRPCHandlers(s.metricsService, s.config.Key, s.privateKey)
+	grpcInterceptor := middleware.NewGRPCInterceptor(
+		s.privateKey,
+		s.config.Key,
+		s.config.TrustedSubnet,
+		s.config.StoreInterval,
+		s.storage,
+	)
+
+	serverOpts := []grpc.ServerOption{
+		grpc.UnaryInterceptor(grpcInterceptor.UnaryServerInterceptor()),
+		grpc.StreamInterceptor(grpcInterceptor.StreamServerInterceptor()),
+	}
+
+	s.grpcServer = grpc.NewServer(serverOpts...)
+	rpc.RegisterMonitoringServiceServer(s.grpcServer, grpcHandlers)
+
+	listener, err := net.Listen("tcp", s.config.GRPCAddress)
+	if err != nil {
+		return fmt.Errorf("failed to listen on %s: %w", s.config.GRPCAddress, err)
+	}
+
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+
+		logger.Log.Info("Starting gRPC server")
+		if err := s.grpcServer.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+			logger.Log.Error("gRPC server failed", zap.Error(err))
+		}
+	}()
+
+	return nil
+}
+
 func (s *ServerApp) shutdown(ctx context.Context) {
 	if s.config.StoreInterval > 0 && s.storage != nil {
 		logger.Log.Info("Saving final metrics before shutdown")
@@ -226,6 +286,11 @@ func (s *ServerApp) shutdown(ctx context.Context) {
 		}
 	}
 
+	if s.grpcServer != nil {
+		s.grpcServer.GracefulStop()
+		logger.Log.Info("gRPC server stopped successfully")
+	}
+
 	if s.db != nil {
 		if err := s.db.Close(); err != nil {
 			logger.Log.Error("Failed to close database connection", zap.Error(err))
@@ -235,13 +300,14 @@ func (s *ServerApp) shutdown(ctx context.Context) {
 }
 
 func (s *ServerApp) registerRoutes(r *chi.Mux) {
-	handlers := NewServer(s.storage, s.db)
-	r.Post("/update/{type}/{name}/{value}", helpers.MethodCheck([]string{http.MethodPost})(handlers.UpdateMetrics))
-	r.Get("/value/{type}/{name}", helpers.MethodCheck([]string{http.MethodGet})(handlers.GetValue))
-	r.Post("/update/", helpers.MethodCheck([]string{http.MethodPost})(handlers.UpdateMetrics))
-	r.Post("/value/", helpers.MethodCheck([]string{http.MethodPost})(handlers.GetValue))
-	r.Get("/value/", helpers.MethodCheck([]string{http.MethodGet})(handlers.GetValue))
-	r.Get("/", helpers.MethodCheck([]string{http.MethodGet})(handlers.GetMetricsList))
-	r.Get("/ping", helpers.MethodCheck([]string{http.MethodGet})(handlers.PingHandler))
-	r.Post("/updates/", helpers.MethodCheck([]string{http.MethodPost})(handlers.UpdateBatchMetrics))
+	httpHandlers := httphandlers.NewHTTPHandlers(s.metricsService, s.config.Key)
+
+	r.Post("/update/{type}/{name}/{value}", helpers.MethodCheck([]string{http.MethodPost})(httpHandlers.UpdateMetrics))
+	r.Get("/value/{type}/{name}", helpers.MethodCheck([]string{http.MethodGet})(httpHandlers.GetValue))
+	r.Post("/update/", helpers.MethodCheck([]string{http.MethodPost})(httpHandlers.UpdateMetrics))
+	r.Post("/value/", helpers.MethodCheck([]string{http.MethodPost})(httpHandlers.GetValue))
+	r.Get("/value/", helpers.MethodCheck([]string{http.MethodGet})(httpHandlers.GetValue))
+	r.Get("/", helpers.MethodCheck([]string{http.MethodGet})(httpHandlers.GetMetricsList))
+	r.Get("/ping", helpers.MethodCheck([]string{http.MethodGet})(httpHandlers.PingHandler))
+	r.Post("/updates/", helpers.MethodCheck([]string{http.MethodPost})(httpHandlers.UpdateBatchMetrics))
 }
